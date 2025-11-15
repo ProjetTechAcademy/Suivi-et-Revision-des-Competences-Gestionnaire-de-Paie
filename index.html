@@ -1434,7 +1434,7 @@ B3_M5_010_Synthèse et application : Assister les utilisateurs du SIRH`;
                 const infoDiv = document.getElementById('selected-session-info');
                 const sessionStart = new Date(selectedSession.startDate);
                 const sessionEnd = new Date(selectedSession.endDate);
-                let fictionalNote = selectedSession.isFictional ? '<span class="text-red-500 font-bold ml-2"> (Dates fictives en attente de communication officielle de Studi via la newsletter)</span>' : '';
+                let fictionalNote = selectedSession.isFictional ? '<span class="text-red-500 font-bold ml-2"> (Dates de communication officielle via la newsletter)</span>' : '';
 
                 infoDiv.innerHTML = `
                     <p>Date de l'examen : Du <strong>${formatDateFull(sessionStart)}</strong> au <strong>${formatDateFull(sessionEnd)}</strong>${fictionalNote}</p>
