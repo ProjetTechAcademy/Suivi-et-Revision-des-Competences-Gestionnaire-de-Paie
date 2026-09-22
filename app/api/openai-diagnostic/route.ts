@@ -18,46 +18,54 @@ export async function GET() {
     });
   }
 
-  const headers = { Authorization: `Bearer ${apiKey}` };
+  const headers = { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" };
 
-  let vectorStatus = 0;
-  let vectorBody = "";
-  try {
-    const r = await fetch(`https://api.openai.com/v1/vector_stores/${encodeURIComponent(vectorStoreId)}`, {
-      headers,
-      cache: "no-store",
-    });
-    vectorStatus = r.status;
-    vectorBody = await r.text();
-  } catch {
-    return NextResponse.json({ ok: false, stage: "network", vectorStatus: 0 });
-  }
-
-  let modelStatus = 0;
-  try {
-    const r = await fetch(`https://api.openai.com/v1/models/${encodeURIComponent(model)}`, {
-      headers,
-      cache: "no-store",
-    });
-    modelStatus = r.status;
-  } catch {
-    modelStatus = 0;
-  }
-
+  const vectorResponse = await fetch(`https://api.openai.com/v1/vector_stores/${encodeURIComponent(vectorStoreId)}`, {
+    headers: { Authorization: `Bearer ${apiKey}` },
+    cache: "no-store",
+  });
+  const vectorBody = await vectorResponse.text();
   let vectorErrorType: string | null = null;
   try {
     const parsed = JSON.parse(vectorBody) as { error?: { type?: string; code?: string } };
     vectorErrorType = parsed.error?.code || parsed.error?.type || null;
   } catch {}
 
+  const modelResponse = await fetch(`https://api.openai.com/v1/models/${encodeURIComponent(model)}`, {
+    headers: { Authorization: `Bearer ${apiKey}` },
+    cache: "no-store",
+  });
+
+  const responseTest = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      model,
+      input: "Test de connexion Campus PAÏA",
+      tools: [{ type: "file_search", vector_store_ids: [vectorStoreId], max_num_results: 2 }],
+      include: ["file_search_call.results"],
+    }),
+  });
+  const responseBody = await responseTest.text();
+  let responseErrorType: string | null = null;
+  let responseErrorMessage: string | null = null;
+  try {
+    const parsed = JSON.parse(responseBody) as { error?: { type?: string; code?: string; message?: string } };
+    responseErrorType = parsed.error?.code || parsed.error?.type || null;
+    responseErrorMessage = parsed.error?.message ? parsed.error.message.slice(0, 300) : null;
+  } catch {}
+
   return NextResponse.json({
-    ok: vectorStatus >= 200 && vectorStatus < 300 && modelStatus >= 200 && modelStatus < 300,
+    ok: vectorResponse.ok && modelResponse.ok && responseTest.ok,
     stage: "openai",
     apiKeyConfigured: true,
     vectorStoreConfigured: true,
-    vectorStatus,
+    vectorStatus: vectorResponse.status,
     vectorErrorType,
-    modelStatus,
+    modelStatus: modelResponse.status,
     model,
+    responseStatus: responseTest.status,
+    responseErrorType,
+    responseErrorMessage,
   });
 }
