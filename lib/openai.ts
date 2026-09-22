@@ -21,10 +21,24 @@ export async function attachVectorStoreFile(apiKey: string, vectorStoreId: strin
   return response.json() as Promise<{ id: string; status: string }>;
 }
 
-export type VectorStoreFile = { id: string; attributes?: Record<string, string | boolean> };
+export async function findVectorStoreFilesByAttribute(apiKey: string, vectorStoreId: string, key: string, value: string) {
+  const response = await fetch(`${OPENAI_BASE_URL}/vector_stores/${encodeURIComponent(vectorStoreId)}/search`, {
+    method: "POST",
+    headers: openAIHeaders(apiKey),
+    body: JSON.stringify({
+      query: value,
+      filters: { type: "eq", key, value },
+      max_num_results: 50,
+      rewrite_query: false,
+    }),
+  });
+  if (!response.ok) throw new Error(`OPENAI_VECTOR_SEARCH_FAILED:${response.status}`);
+  const data = await response.json() as { data?: Array<{ file_id?: string }> };
+  return [...new Set((data.data ?? []).map((item) => item.file_id).filter((id): id is string => Boolean(id)))];
+}
 
 export async function listVectorStoreFiles(apiKey: string, vectorStoreId: string) {
-  const files: VectorStoreFile[] = [];
+  const files: Array<{ id: string; attributes?: Record<string, string | boolean> }> = [];
   let after = "";
   do {
     const query = new URLSearchParams({ limit: "100" });
@@ -33,7 +47,7 @@ export async function listVectorStoreFiles(apiKey: string, vectorStoreId: string
       headers: openAIHeaders(apiKey, false), cache: "no-store",
     });
     if (!response.ok) throw new Error(`OPENAI_VECTOR_LIST_FAILED:${response.status}`);
-    const page = await response.json() as { data?: VectorStoreFile[]; has_more?: boolean; last_id?: string };
+    const page = await response.json() as { data?: Array<{ id: string; attributes?: Record<string, string | boolean> }>; has_more?: boolean; last_id?: string };
     files.push(...(page.data ?? []));
     after = page.has_more && page.last_id ? page.last_id : "";
   } while (after);

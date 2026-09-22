@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isCampusSyncAuthorized } from "@/lib/campus-auth";
 import { buildIndexDocument, normalizeCorpusResource, publicAttributes } from "@/lib/corpus";
-import { attachVectorStoreFile, detachVectorStoreFile, listVectorStoreFiles, uploadOpenAIFile } from "@/lib/openai";
+import { attachVectorStoreFile, detachVectorStoreFile, findVectorStoreFilesByAttribute, uploadOpenAIFile } from "@/lib/openai";
 
 export const runtime = "nodejs";
 class InvalidPayloadError extends Error {}
@@ -41,11 +41,9 @@ export async function POST(request: NextRequest) {
     const journal = { resourceCode: resource.resourceCode || null, status: incomplete ? "metadata_incomplete" : "accepted", warnings };
     if (incomplete) return NextResponse.json(journal, { status: 422 });
 
-    const existing = await listVectorStoreFiles(apiKey, vectorStoreId);
-    const previous = existing.filter((item) => item.attributes?.resource_code === resource.resourceCode);
-    await Promise.all(previous.map((item) => detachVectorStoreFile(apiKey, vectorStoreId, item.id)));
-
+    const previous = await findVectorStoreFilesByAttribute(apiKey, vectorStoreId, "resource_code", resource.resourceCode);
     const attributes = publicAttributes(resource);
+
     const manifest = new File([buildIndexDocument(resource)], `${resource.resourceCode || "position"}-catalogue.txt`, { type: "text/plain" });
     const uploadedManifest = await uploadOpenAIFile(apiKey, manifest);
     const attachedManifest = await attachVectorStoreFile(apiKey, vectorStoreId, uploadedManifest.id, attributes);
@@ -55,6 +53,8 @@ export async function POST(request: NextRequest) {
       const uploadedSource = await uploadOpenAIFile(apiKey, file);
       sourceStatus = (await attachVectorStoreFile(apiKey, vectorStoreId, uploadedSource.id, attributes)).status;
     }
+
+    await Promise.all(previous.map((fileId) => detachVectorStoreFile(apiKey, vectorStoreId, fileId)));
 
     const processing = [attachedManifest.status, sourceStatus].filter(Boolean).some((status) => status !== "completed");
     return NextResponse.json({ ...journal, status: processing ? "processing" : "indexed", vectorFileId: attachedManifest.id, manifestStatus: attachedManifest.status, sourceStatus: sourceStatus ?? null, replaced: previous.length });
