@@ -1,9 +1,10 @@
-# Actifs officiels PAÏA
+# Actifs officiels PAÏA — noms sources immuables
 
-Déposer ici, sans conversion ni modification, les fichiers officiels originaux :
+Les quatre fichiers officiels doivent rester ici sans renommage, conversion ou modification :
 
-- `paia-symbol.png`
-- `paia-logo.png`
-- `mmpa-logo.png`
+- `01_PAIA_Circulaire_Logo_Principal.png`
+- `02_PAIA_Circulaire_Logo_Compact.png`
+- `03_MMPA_Circulaire_Logo.png`
+- `04_PAIA_Circulaire_Icone.png`
 
-Ces fichiers binaires sont téléversés séparément lorsque le connecteur de pull request Codex ne les prend pas en charge. Ne pas les recadrer, recolorer, compresser ou remplacer.
+Ne pas recadrer, recolorer, compresser, redessiner ou remplacer ces fichiers.

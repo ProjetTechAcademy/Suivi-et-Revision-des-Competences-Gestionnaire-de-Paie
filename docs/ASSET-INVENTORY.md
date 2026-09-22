@@ -1,21 +1,16 @@
-# Inventaire des actifs — mise à jour du 22 septembre 2026
+# Inventaire des actifs — noms sources immuables
 
-## Actifs officiels requis à l’exécution
+## Logos officiels
 
-Les fichiers suivants doivent être téléversés séparément dans GitHub, car le connecteur de pull request Codex ne prend pas en charge les binaires :
+| Fichier source officiel | Utilisation dans Campus PAÏA |
+| --- | --- |
+| `public/brand/01_PAIA_Circulaire_Logo_Principal.png` | Hero et médaillon principal |
+| `public/brand/02_PAIA_Circulaire_Logo_Compact.png` | Header, navigation et fiche Campus |
+| `public/brand/03_MMPA_Circulaire_Logo.png` | Footer et signature institutionnelle |
+| `public/brand/04_PAIA_Circulaire_Icone.png` | Icône, favicon et petits emplacements |
 
-- `public/brand/paia-symbol.png` : symbole PAÏA officiel.
-- `public/brand/paia-logo.png` : logo PAÏA officiel.
-- `public/brand/mmpa-logo.png` : logo MMPA officiel.
-- `public/reference/campus-home-reference.png` : représentation officielle fournie de Pia.
+Aucun pixel, texte, ratio ou élément graphique ne doit être modifié.
 
-## Références de conception non requises au déploiement
+## Référence de Pia
 
-- maquette de la fiche Campus PAÏA ;
-- guide graphique PAÏA.
-
-Ces deux fichiers restent dans le dossier de conception local et n’ont pas besoin d’être publiés avec l’application.
-
-## Protection de la marque
-
-Les actifs à téléverser sont les fichiers originaux reçus. Aucun pixel, texte, ratio ou colorimétrie ne doit être modifié. Le code les référence directement avec `next/image` et `object-fit: contain`.
+La maquette contenant Pia est conservée dans `public/reference/`. Un alias technique stable est utilisé par le code sans modifier le fichier original.
