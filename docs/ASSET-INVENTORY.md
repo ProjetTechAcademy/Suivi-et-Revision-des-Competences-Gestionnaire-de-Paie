@@ -1,15 +1,20 @@
-# Inventaire des actifs — noms originaux conservés
+# Inventaire des actifs — noms sources immuables
 
-## Actifs fournis
+## Logos officiels
 
-Le code utilise désormais les noms numérotés d’origine. Aucun renommage des fichiers fournis n’est demandé :
+Le code utilise exclusivement les quatre noms d’origine ci-dessous :
 
-- `public/reference/image_1.png` : maquette Campus PAÏA et représentation fournie de Pia ;
-- `public/brand/image_2.png` : symbole PAÏA officiel ;
-- `public/brand/image_3.png` : logo MMPA officiel ;
-- `public/brand/image_4.png` : logo PAÏA « by MMPA » officiel ;
-- `public/brand/image_5.png` : logo PAÏA « Paie · Absences · Indemnisation · Analyse » officiel.
+| Fichier source officiel | Utilisation dans Campus PAÏA |
+| --- | --- |
+| `public/brand/01_PAIA_Circulaire_Logo_Principal.png` | Hero et médaillon principal |
+| `public/brand/02_PAIA_Circulaire_Logo_Compact.png` | Header, navigation et fiche Campus |
+| `public/brand/03_MMPA_Circulaire_Logo.png` | Footer, À propos et signature institutionnelle |
+| `public/brand/04_PAIA_Circulaire_Icone.png` | Icône, favicon et petits emplacements |
 
 ## Protection de la marque
 
-Les cinq fichiers doivent être téléversés séparément dans GitHub sous ces noms exacts, car le connecteur de pull request Codex ne prend pas en charge les binaires. Aucun pixel, texte, ratio ou colorimétrie ne doit être modifié.
+Ces fichiers doivent être téléversés séparément dans GitHub sous leurs noms exacts, car le connecteur de pull request Codex ne prend pas en charge les binaires. Aucun pixel, texte, ratio ou élément graphique ne doit être modifié.
+
+## Référence de Pia
+
+La maquette contenant la représentation de Pia reste référencée depuis `public/reference/image_1.png`. Elle n’est pas un logo et n’est pas renommée par cette correction.

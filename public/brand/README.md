@@ -1,10 +1,10 @@
-# Actifs officiels PAÏA — noms d’origine conservés
+# Actifs officiels PAÏA — noms sources immuables
 
-Déposer ici les fichiers officiels sous leurs noms numérotés d’origine, sans les renommer ni les modifier :
+Les quatre fichiers officiels doivent être déposés ici sans renommage, conversion ou modification :
 
-- `image_2.png` — symbole PAÏA vertical ;
-- `image_3.png` — logo MMPA ;
-- `image_4.png` — logo PAÏA « by MMPA » utilisé par Campus ;
-- `image_5.png` — logo PAÏA « Paie · Absences · Indemnisation · Analyse », conservé même s’il n’est pas encore affiché.
+- `01_PAIA_Circulaire_Logo_Principal.png` — logo PAÏA principal, utilisé dans le médaillon du Hero ;
+- `02_PAIA_Circulaire_Logo_Compact.png` — logo PAÏA compact, utilisé dans le header et la fiche ;
+- `03_MMPA_Circulaire_Logo.png` — logo MMPA, utilisé dans le footer et la signature institutionnelle ;
+- `04_PAIA_Circulaire_Icone.png` — icône PAÏA seule, utilisée dans les petits emplacements et le favicon.
 
-Ne pas les recadrer, recolorer, compresser ou remplacer.
+Ne pas recadrer, recolorer, compresser, redessiner ou remplacer ces fichiers.
