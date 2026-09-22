@@ -1,24 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { ResourceRecommendation } from "@/lib/corpus";
-import { OPENAI_BASE_URL, openAIHeaders } from "@/lib/openai";
+import { answerWithGroq } from "@/lib/groq";
+import { searchQdrant } from "@/lib/qdrant";
 
-type SearchResult = { score?: number; attributes?: Record<string, string | boolean> };
 type SearchBody = { query: string; pulse?: string; resourceCode?: string };
 
-function textFromResponse(data: { output?: Array<{ content?: Array<{ type?: string; text?: string }> }> }) {
-  return data.output?.flatMap((item) => item.content ?? []).find((item) => item.type === "output_text")?.text ?? "";
-}
-function recommendationsFromResponse(data: { output?: Array<{ type?: string; results?: SearchResult[] }> }) {
-  const results = data.output?.filter((item) => item.type === "file_search_call").flatMap((item) => item.results ?? []) ?? [];
-  const seen = new Set<string>();
-  return results.flatMap((result): ResourceRecommendation[] => {
-    const a = result.attributes ?? {};
-    const resourceCode = String(a.resource_code ?? "");
-    if (!resourceCode || a.reserved === true || seen.has(resourceCode)) return [];
-    seen.add(resourceCode);
-    return [{ resourceCode, formation:String(a.formation ?? ""), blockCode:String(a.block_code ?? ""), blockTitle:String(a.block_title ?? ""), moduleCode:String(a.module_code ?? ""), moduleTitle:String(a.module_title ?? ""), resourceType:String(a.resource_type ?? ""), title:String(a.title ?? ""), reason:"Cette ressource contient des éléments directement liés à votre question." }];
-  }).slice(0, 6);
-}
 async function readBody(request: NextRequest): Promise<SearchBody | null> {
   try {
     const value = await request.json() as unknown;
@@ -27,30 +13,67 @@ async function readBody(request: NextRequest): Promise<SearchBody | null> {
     if (typeof body.query !== "string" || !body.query.trim()) return null;
     if (body.pulse !== undefined && typeof body.pulse !== "string") return null;
     if (body.resourceCode !== undefined && typeof body.resourceCode !== "string") return null;
-    return { query: body.query.trim().slice(0,800), pulse: typeof body.pulse === "string" ? body.pulse.trim().slice(0,256) : undefined, resourceCode: typeof body.resourceCode === "string" ? body.resourceCode.trim().slice(0,256) : undefined };
-  } catch { return null; }
+    return {
+      query: body.query.trim().slice(0, 800),
+      pulse: typeof body.pulse === "string" ? body.pulse.trim().slice(0, 256) : undefined,
+      resourceCode: typeof body.resourceCode === "string" ? body.resourceCode.trim().slice(0, 256) : undefined,
+    };
+  } catch {
+    return null;
+  }
 }
+
+function recommendations(hits: Awaited<ReturnType<typeof searchQdrant>>) {
+  const seen = new Set<string>();
+  return hits.flatMap((hit): ResourceRecommendation[] => {
+    const payload = hit.payload ?? {};
+    const resourceCode = String(payload.resource_code ?? "");
+    if (!resourceCode || seen.has(resourceCode)) return [];
+    seen.add(resourceCode);
+    return [{
+      resourceCode,
+      formation: String(payload.formation ?? ""),
+      blockCode: String(payload.block_code ?? ""),
+      blockTitle: String(payload.block_title ?? ""),
+      moduleCode: String(payload.module_code ?? ""),
+      moduleTitle: String(payload.module_title ?? ""),
+      resourceType: String(payload.resource_type ?? ""),
+      title: String(payload.title ?? ""),
+      reason: "Cette ressource contient des éléments liés à votre question.",
+    }];
+  }).slice(0, 6);
+}
+
 export async function POST(request: NextRequest) {
   const body = await readBody(request);
   if (!body) return NextResponse.json({ error: "Requête de recherche invalide." }, { status: 400 });
-  const apiKey = process.env.OPENAI_API_KEY;
-  const vectorStoreId = process.env.OPENAI_VECTOR_STORE_ID;
-  if (!apiKey || !vectorStoreId) return NextResponse.json({ error: "Corpus Campus PAÏA non connecté", code:"CORPUS_NOT_CONNECTED" }, { status:503 });
 
-  const conditions = [...(body.pulse ? [{type:"eq",key:"pulse",value:body.pulse}] : []), ...(body.resourceCode ? [{type:"eq",key:"resource_code",value:body.resourceCode}] : [])];
-  const filters = conditions.length === 0 ? undefined : conditions.length === 1 ? conditions[0] : { type:"and", filters:conditions };
+  if (!process.env.GROQ_API_KEY || !process.env.QDRANT_URL || !process.env.QDRANT_API_KEY) {
+    return NextResponse.json({ error: "Corpus Campus PAÏA non connecté", code: "CORPUS_NOT_CONNECTED" }, { status: 503 });
+  }
 
-  let response: Response;
   try {
-    response = await fetch(`${OPENAI_BASE_URL}/responses`, {
-      method:"POST", headers:openAIHeaders(apiKey),
-      body:JSON.stringify({ model:process.env.OPENAI_MODEL || "gpt-5-mini", instructions:["Tu es Campus PAÏA, une base de connaissances personnelle, pas une plateforme de formation.","Réponds en français de façon pédagogique, structurée et concrète à partir du corpus fourni.","Distingue le contenu pédagogique historique des règles réglementaires actuelles.","N'invente pas de source et ne révèle jamais URL Drive, ID Drive, chemin local, secret ou nom de fichier technique."].join(" "), input:body.query, tools:[{type:"file_search",vector_store_ids:[vectorStoreId],max_num_results:12,...(filters ? {filters} : {})}], include:["file_search_call.results"] })
+    const hits = await searchQdrant(body.query, { pulse: body.pulse, resourceCode: body.resourceCode }, 10);
+    const contexts = hits
+      .map((hit) => String(hit.payload?.content ?? ""))
+      .filter(Boolean);
+
+    if (!contexts.length) {
+      return NextResponse.json({
+        title: body.query,
+        summary: "Aucune ressource pertinente n’a encore été trouvée dans le corpus indexé.",
+        resources: [],
+      });
+    }
+
+    const answer = await answerWithGroq(body.query, contexts);
+    return NextResponse.json({
+      title: body.query,
+      summary: answer,
+      resources: recommendations(hits),
     });
-  } catch { return NextResponse.json({ error:"La recherche Campus PAÏA est momentanément indisponible." }, {status:502}); }
-  if (!response.ok) return NextResponse.json({ error:"La recherche Campus PAÏA est momentanément indisponible." }, {status:502});
-  try {
-    const data = await response.json();
-    const answer = textFromResponse(data);
-    return NextResponse.json({ title:body.query, summary:answer || "Aucun contenu pertinent n’a été trouvé dans le corpus.", resources:recommendationsFromResponse(data) });
-  } catch { return NextResponse.json({ error:"Réponse OpenAI invalide." }, {status:502}); }
+  } catch (error) {
+    console.error("Campus PAÏA search error", error);
+    return NextResponse.json({ error: "La recherche Campus PAÏA est momentanément indisponible." }, { status: 502 });
+  }
 }
