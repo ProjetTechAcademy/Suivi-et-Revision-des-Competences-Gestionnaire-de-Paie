@@ -22,6 +22,17 @@ Chaque position reçoit un manifeste indexable, y compris les vidéos sans trans
 
 La synchronisation doit transmettre séparément `blockCode`, `blockTitle`, `moduleCode` et `moduleTitle`. Pour le Projet 15, les six intitulés de blocs connus sont restaurés côté serveur si nécessaire ; les intitulés des 46 modules doivent provenir des dossiers Drive et être transmis par le Google Apps Script.
 
+## Compatibilité Google Apps Script V2
+
+Les anciennes routes Cloudflare sont reproduites côté serveur pour permettre une migration sans réécriture du parcours Drive :
+
+- `GET /api/controller/ping` ;
+- `POST /api/controller/setup-search` ;
+- `GET /api/controller/corpus-stats` ;
+- `POST /api/controller/index-document`.
+
+Elles acceptent l’ancien header `X-Campus-Controller-Token`, ainsi que `x-campus-sync-secret` et `Authorization: Bearer`. Les trois formes sont comparées uniquement à `CAMPUS_SYNC_SECRET` côté serveur. L’ancienne indexation JSON `{ key, text }` ou `{ key, contentBase64 }` est acceptée ; une entrée portant la même `key` remplace son rattachement précédent dans le Vector Store afin de limiter les doublons.
+
 ## Actifs de marque officiels
 
 Les fichiers PAÏA et MMPA originaux sont conservés sans modification dans `public/brand/`. Les maquettes et le guide graphique reçus sont archivés dans `public/reference/`. Ne jamais convertir, recadrer, recolorer ou écraser les actifs placés dans `public/brand/`.

@@ -1,18 +1,9 @@
-import { createHash, timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
+import { isCampusSyncAuthorized } from "@/lib/campus-auth";
 import { buildIndexDocument, normalizeCorpusResource, publicAttributes } from "@/lib/corpus";
 import { attachVectorStoreFile, uploadOpenAIFile } from "@/lib/openai";
 
 export const runtime = "nodejs";
-
-function authorized(request: NextRequest, expected: string) {
-  const supplied = request.headers.get("x-campus-sync-secret")
-    || request.headers.get("authorization")?.replace(/^Bearer\s+/i, "")
-    || "";
-  const left = createHash("sha256").update(supplied).digest();
-  const right = createHash("sha256").update(expected).digest();
-  return Boolean(supplied) && timingSafeEqual(left, right);
-}
 
 async function readPayload(request: NextRequest) {
   if (request.headers.get("content-type")?.includes("multipart/form-data")) {
@@ -27,7 +18,7 @@ async function readPayload(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const syncSecret = process.env.CAMPUS_SYNC_SECRET;
-  if (!syncSecret || !authorized(request, syncSecret)) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+  if (!syncSecret || !isCampusSyncAuthorized(request, syncSecret)) return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
   const apiKey = process.env.OPENAI_API_KEY;
   const vectorStoreId = process.env.OPENAI_VECTOR_STORE_ID;
   if (!apiKey || !vectorStoreId) return NextResponse.json({ error: "Index Campus PAÏA non configuré" }, { status: 503 });
