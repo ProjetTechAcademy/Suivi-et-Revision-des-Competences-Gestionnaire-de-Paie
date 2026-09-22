@@ -14,7 +14,7 @@ const pulseStyles = ["blue", "purple", "teal", "rose", "gold", "green", "indigo"
 function Brand({ compact = false }: { compact?: boolean }) {
   return (
     <span className={compact ? "brand compact" : "brand"}>
-      <Image src="/brand/paia-symbol.png" width={56} height={56} alt="Symbole officiel PAÏA" priority />
+      <Image src="/brand/02_PAIA_Circulaire_Logo_Compact.png" width={56} height={56} alt="Logo officiel PAÏA compact" priority />
       <span><strong>Campus PAÏA</strong><small>Savoir aujourd’hui. Agir demain.</small></span>
     </span>
   );
@@ -80,11 +80,11 @@ function Hero() {
         </div>
         <div className="heroMedallion" aria-label="Logo officiel PAÏA">
           <i className="orbit orbitOne" /><i className="orbit orbitTwo" />
-          <div className="logoDisc"><Image src="/brand/paia-logo.png" width={1080} height={1080} alt="Logo officiel PAÏA" priority /></div>
+          <div className="logoDisc"><Image src="/brand/01_PAIA_Circulaire_Logo_Principal.png" width={1080} height={1080} alt="Logo officiel PAÏA" priority /></div>
           <span className="orbitLabel">SAVOIR · PRATIQUER · ÉVOLUER</span>
         </div>
         <div className="piaHero">
-          <div className="piaCrop" role="img" aria-label="Pia, la mascotte officielle de Campus PAÏA"><Image src="/reference/campus-home-reference.png" width={1312} height={1199} alt="" priority /></div>
+          <div className="piaCrop" role="img" aria-label="Pia, la mascotte officielle de Campus PAÏA"><Image src="/reference/image_1.png" width={1312} height={1199} alt="" priority /></div>
           <div className="heroBubble"><b>Bonjour !</b><span>Je suis Pia, votre compagne de recherche.</span><small>Une question ? On explore ensemble !</small></div>
         </div>
       </div>
@@ -169,7 +169,7 @@ function KnowledgeSheet({ answer }: { answer: Answer | null }) {
       <div className="shell"><h2>Aperçu d’une fiche Campus PAÏA</h2><div className="sheetLayout">
         <aside className="sheetToc"><b>Sommaire</b>{contents.map((item, index) => <a className={index === 0 ? "active" : ""} href={`#part-${index}`} key={item}><span>{index === 0 ? "⊞" : "◉"}</span>{item}</a>)}<button onClick={() => window.print()}>▣　Imprimer</button></aside>
         <article className="knowledgeCard"><div className="domainRail">PAIE & SOCIAL</div><div className="knowledgeBody">
-          <header><div><h1>{answer?.title || "DSN — Comprendre la déclaration sociale nominative"}</h1><p>De la logique déclarative au contrôle des données sociales</p></div><Image src="/brand/paia-logo.png" width={124} height={124} alt="Logo officiel PAÏA" /></header>
+          <header><div><h1>{answer?.title || "DSN — Comprendre la déclaration sociale nominative"}</h1><p>De la logique déclarative au contrôle des données sociales</p></div><Image src="/brand/02_PAIA_Circulaire_Logo_Compact.png" width={124} height={124} alt="Logo officiel PAÏA" /></header>
           <div className="sheetMeta"><span>◆　Pulse Paie & Social</span><span>◷　Lecture : 7 min</span><span>▣　Vérifié le 21/09/2026</span><button onClick={toggleFavorite}>{favorite ? "★ Favori" : "☆ Ajouter"}</button></div>
           <div className="reference"><b>▤　Référence pédagogique</b><p>Gestionnaire de Paie · Administration de la paie<br />Module 4 — Les déclarations sociales<br />Accès Studi : retrouvez cette ressource dans votre médiathèque avec votre code interne.</p></div>
           <section className="thirty" id="part-0"><h3>🎯　En 30 secondes</h3><p>{text}</p><small>Source recommandée : documentation officielle en vigueur.</small></section>
@@ -185,12 +185,12 @@ function KnowledgeSheet({ answer }: { answer: Answer | null }) {
 }
 
 function WhyPaia() {
-  return <section className="why shell" id="apropos"><h2><Image src="/brand/paia-symbol.png" width={48} height={48} alt="" />Pourquoi Campus PAÏA ?</h2><div><p><b>✓　Des réponses issues de vos cours</b><span>Croisées avec les sources officielles.</span></p><p><b>◎　Une veille actualisée</b><span>Réglementaire, sociale, numérique…</span></p><p><b>♧　Des explications concrètes</b><span>Avec exemples et cas pratiques.</span></p><p><b>♡　Une touche positive</b><span>Parce qu’apprendre peut être motivant !</span></p></div></section>;
+  return <section className="why shell" id="apropos"><h2><Image src="/brand/04_PAIA_Circulaire_Icone.png" width={48} height={48} alt="" />Pourquoi Campus PAÏA ?</h2><div><p><b>✓　Des réponses issues de vos cours</b><span>Croisées avec les sources officielles.</span></p><p><b>◎　Une veille actualisée</b><span>Réglementaire, sociale, numérique…</span></p><p><b>♧　Des explications concrètes</b><span>Avec exemples et cas pratiques.</span></p><p><b>♡　Une touche positive</b><span>Parce qu’apprendre peut être motivant !</span></p></div></section>;
 }
 
 export default function CampusApp() {
   const [answer, setAnswer] = useState<Answer | null>(null);
   const [pulse, setPulse] = useState("");
   const selectPulse = (name: string) => { setPulse(name); document.querySelector(".searchArea")?.scrollIntoView({ behavior: "smooth", block: "center" }); };
-  return <><Header /><main><Hero /><Search answer={answer} setAnswer={setAnswer} pulse={pulse} clearPulse={() => setPulse("")} /><Pulses onSelect={selectPulse} /><Shortcuts /><WhyPaia /><Explorer /><KnowledgeSheet answer={answer} /><div id="favoris" /></main><footer><div className="shell"><Brand compact /><p>🌱 Apprendre. Comprendre. Progresser. Ensemble.</p><span>Campus PAÏA · Septembre 2026</span><Image src="/brand/mmpa-logo.png" width={56} height={56} alt="Logo officiel MMPA" /></div></footer><PiaAssistant /></>;
+  return <><Header /><main><Hero /><Search answer={answer} setAnswer={setAnswer} pulse={pulse} clearPulse={() => setPulse("")} /><Pulses onSelect={selectPulse} /><Shortcuts /><WhyPaia /><Explorer /><KnowledgeSheet answer={answer} /><div id="favoris" /></main><footer><div className="shell"><Brand compact /><p>🌱 Apprendre. Comprendre. Progresser. Ensemble.</p><span>Campus PAÏA · Septembre 2026</span><Image src="/brand/03_MMPA_Circulaire_Logo.png" width={56} height={56} alt="Logo officiel MMPA" /></div></footer><PiaAssistant /></>;
 }
