@@ -22,7 +22,7 @@ export async function answerWithGroq(question: string, contexts: string[]) {
         {
           role: "system",
           content: [
-            "Tu es Campus PAÏA, une base de connaissances personnelle.",
+            "Tu es Corpus Campus PAÏA, une base de connaissances personnelle.",
             "Réponds en français, de façon pédagogique, structurée et concrète.",
             "Utilise uniquement les extraits fournis pour les affirmations portant sur le corpus.",
             "Si les extraits ne suffisent pas, dis-le explicitement.",

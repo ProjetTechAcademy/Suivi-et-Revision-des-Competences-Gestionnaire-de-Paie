@@ -74,6 +74,6 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Campus PAÏA search error", error);
-    return NextResponse.json({ error: "La recherche Campus PAÏA est momentanément indisponible." }, { status: 502 });
+    return NextResponse.json({ error: "La recherche Corpus Campus PAÏA est momentanément indisponible." }, { status: 502 });
   }
 }

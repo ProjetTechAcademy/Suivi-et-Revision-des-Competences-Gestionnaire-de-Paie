@@ -1,189 +1,83 @@
 "use client";
 
 import Image from "next/image";
-import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import type { ResourceRecommendation } from "@/lib/corpus";
-import { formations, pulses } from "@/lib/data";
 import { ThemeToggle } from "./ThemeToggle";
 
 type Answer = { title: string; summary: string; resources?: ResourceRecommendation[] };
-type Formation = keyof typeof formations;
+type CatalogResource = Omit<ResourceRecommendation, "reason"> & { pulse: string };
+type Favorite = { kind: "resource" | "answer"; code: string; title: string };
 
-const pulseStyles = ["blue", "purple", "teal", "rose", "gold", "green", "indigo", "navy"];
+const pulses = [
+  ["Paie & Social", "Paie, déclaratif et protection sociale", "▦"], ["RH", "Talents, recrutement et parcours", "◇"],
+  ["SIRH", "Outils, flux et interopérabilité", "⌘"], ["Droit social", "Relations de travail et réglementation", "§"],
+  ["AMOA & Projet", "Cadrage, conduite et recette", "◎"], ["Management", "Organisation et pratiques collectives", "△"],
+  ["Digital & IA", "IA, automatisation et usages", "✦"], ["Tech", "Développement, données et tests", "</>"],
+] as const;
 
 function Brand({ compact = false }: { compact?: boolean }) {
-  return (
-    <span className={compact ? "brand compact" : "brand"}>
-      <Image src="/brand/02_PAIA_Circulaire_Logo_Compact.png" width={56} height={56} alt="Logo officiel PAÏA compact" priority />
-      <span><strong>Campus PAÏA</strong><small>Savoir aujourd’hui. Agir demain.</small></span>
-    </span>
-  );
+  return <span className={`brand ${compact ? "compact" : ""}`}><Image src="/brand/02_PAIA_Circulaire_Logo_Compact.png" width={56} height={56} alt="Logo PAÏA" priority /><span><strong>Corpus Campus PAÏA</strong><small>Savoir aujourd’hui. Agir demain.</small></span></span>;
 }
 
 function Header() {
   const [open, setOpen] = useState(false);
-  return (
-    <header className="siteHeader">
-      <div className="headerInner shell">
-        <a href="#accueil" aria-label="Campus PAÏA — Accueil"><Brand /></a>
-        <button className="menuButton" onClick={() => setOpen(!open)} aria-expanded={open} aria-label={open ? "Fermer le menu" : "Ouvrir le menu"}>☰</button>
-        <nav className={open ? "mainNav open" : "mainNav"} aria-label="Navigation principale">
-          <a className="active" href="#accueil">⌂ <span>Accueil</span></a>
-          <a href="#explorer">◉ <span>Explorer</span></a>
-          <a href="#enonces">▧ <span>Énoncés</span></a>
-          <a href="#favoris">♡ <span>Mes favoris</span></a>
-          <a href="#apropos">ⓘ <span>À propos</span></a>
-        </nav>
-        <div className="headerTools">
-          <ThemeToggle />
-          <button className="language" aria-label="Langue actuelle : français">◎ <span>FR</span>⌄</button>
-          <button className="profile" aria-label="Profil de Mathilde"><span>M</span><b>Mathilde</b>⌄</button>
-        </div>
-      </div>
-    </header>
-  );
-}
-
-function PiaAssistant() {
-  const [panel, setPanel] = useState(false);
-  const speech = (action: "play" | "pause" | "resume" | "stop") => {
-    if (!("speechSynthesis" in window)) return;
-    if (action === "pause") return speechSynthesis.pause();
-    if (action === "resume") return speechSynthesis.resume();
-    if (action === "stop") return speechSynthesis.cancel();
-    speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance("Bonjour ! Je suis Pia, votre compagne de recherche. Posez-moi une question ou explorez un Pulse !");
-    utterance.lang = "fr-FR";
-    speechSynthesis.speak(utterance);
-  };
-  return (
-    <div className="piaDock">
-      {panel && <div className="piaPanel"><strong>Comment puis-je vous aider ?</strong><a href="#explorer">Explorer une ressource</a><a href="#pulses">Choisir un Pulse</a><button onClick={() => speech("play")}>▷ Lire mon message</button><div><button onClick={() => speech("pause")}>Pause</button><button onClick={() => speech("resume")}>Reprendre</button><button onClick={() => speech("stop")}>Arrêter</button></div></div>}
-      <button className="piaTrigger" onClick={() => setPanel(!panel)} aria-expanded={panel} aria-label={panel ? "Fermer l’assistance Pia" : "Ouvrir l’assistance Pia"}><span className="piaMini" aria-hidden="true" /><span><b>Pia</b><small>Compagne de recherche</small></span></button>
-    </div>
-  );
+  return <header className="siteHeader"><div className="headerInner shell"><a href="#accueil" aria-label="Corpus Campus PAÏA — Accueil"><Brand /></a><button className="menuButton" onClick={() => setOpen(!open)} aria-expanded={open} aria-label={open ? "Fermer le menu" : "Ouvrir le menu"}>☰</button><nav className={`mainNav ${open ? "open" : ""}`} aria-label="Navigation principale"><a href="#accueil">Accueil</a><a href="#explorer">Explorer</a><a href="#recherche">Recherche</a><a href="#favoris">Favoris</a><a href="#apropos">À propos</a></nav><div className="headerTools"><ThemeToggle /></div></div></header>;
 }
 
 function Hero() {
-  return (
-    <section className="hero" id="accueil">
-      <div className="heroGlow" />
-      <div className="heroInner shell">
-        <div className="heroCopy">
-          <span className="overline">VOTRE CONNAISSANCE, ÉCLAIRÉE</span>
-          <h1>Votre allié pour<br /><em>apprendre</em>, comprendre<br />et avancer.</h1>
-          <p>Des connaissances fiables. Des explications claires.<br />Une veille toujours à jour. Et une bonne dose de motivation !</p>
-          <div className="heroStats"><span><b>1 839</b>ressources indexées</span><span><b>8</b>domaines d’expertise</span><span><b>100 %</b>privé & sécurisé</span></div>
-        </div>
-        <div className="heroMedallion" aria-label="Logo officiel PAÏA">
-          <i className="orbit orbitOne" /><i className="orbit orbitTwo" />
-          <div className="logoDisc"><Image src="/brand/01_PAIA_Circulaire_Logo_Principal.png" width={1080} height={1080} alt="Logo officiel PAÏA" priority /></div>
-          <span className="orbitLabel">SAVOIR · PRATIQUER · ÉVOLUER</span>
-        </div>
-      </div>
-    </section>
-  );
+  return <section className="hero" id="accueil"><div className="heroInner shell"><div className="heroCopy"><span className="overline">VOTRE CONNAISSANCE, ÉCLAIRÉE</span><h1>Vos ressources deviennent<br /><em>des connaissances utiles.</em></h1><p>Une base de connaissances privée qui structure vos ressources personnelles, contextualise les réponses et vous accompagne dans chaque domaine.</p><div className="valueList"><span>Recherche intelligente</span><span>Connaissances contextualisées</span><span>Accompagnement par IA</span></div></div><div className="heroMedallion"><i className="orbit" /><div className="logoDisc"><Image src="/brand/01_PAIA_Circulaire_Logo_Principal.png" width={1080} height={1080} alt="Logo officiel PAÏA" priority /></div></div></div></section>;
 }
 
-function Search({ answer, setAnswer, pulse, clearPulse }: { answer: Answer | null; setAnswer: (answer: Answer) => void; pulse: string; clearPulse: () => void }) {
-  const [query, setQuery] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
-    if (!query.trim()) return;
-    setError(""); setLoading(true);
-    try {
-      const response = await fetch("/api/search", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query, pulse }) });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "La recherche est momentanément indisponible.");
-      setAnswer(data);
-      window.setTimeout(() => document.querySelector("#fiche")?.scrollIntoView({ behavior: "smooth" }), 50);
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "La recherche est momentanément indisponible."); }
-    finally { setLoading(false); }
-  };
-  return (
-    <section className="searchArea shell" aria-label="Recherche principale">
-      <form className="searchForm" onSubmit={submit}><span aria-hidden="true">⌕</span><input value={query} onChange={(event: ChangeEvent<HTMLInputElement>) => setQuery(event.target.value)} placeholder="Posez votre question à Campus PAÏA…" aria-label="Posez votre question" /><button disabled={loading} aria-label="Rechercher">{loading ? "…" : "→"}</button></form>
-      <div className="suggestions"><span>Exemples :</span>{["DSN", "Recrutement", "Recette fonctionnelle", "Formation professionnelle"].map((item) => <button key={item} onClick={() => setQuery(item)}>{item}</button>)}</div>
-      {pulse && <div className="activeFilter">Pulse sélectionné : <b>{pulse}</b><button onClick={clearPulse}>×</button></div>}
-      {error && <p className="searchError" role="alert">{error}</p>}
-      {answer && <span className="srOnly">Une réponse est disponible dans la fiche Campus PAÏA.</span>}
-    </section>
-  );
+function Search({ answer, setAnswer, pulse, clearPulse, inputRef }: { answer: Answer | null; setAnswer: (value: Answer) => void; pulse: string; clearPulse: () => void; inputRef: React.RefObject<HTMLInputElement | null> }) {
+  const [query, setQuery] = useState(""); const [loading, setLoading] = useState(false); const [error, setError] = useState("");
+  const submit = async (event: FormEvent) => { event.preventDefault(); if (!query.trim()) return; setError(""); setLoading(true); try { const response = await fetch("/api/search", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query, pulse }) }); const data = await response.json(); if (!response.ok) throw new Error(data.error || "La recherche est momentanément indisponible."); setAnswer(data); setTimeout(() => document.querySelector("#fiche")?.scrollIntoView({ behavior: "smooth" }), 80); } catch (reason) { setError(reason instanceof Error ? reason.message : "La recherche est momentanément indisponible."); } finally { setLoading(false); } };
+  const examples = ["Comparer deux méthodes de gestion de projet", "Expliquer une notion de droit social", "Comprendre les tests d’une API", "Préparer une séquence de formation"];
+  return <section className="searchArea shell" id="recherche" aria-labelledby="search-title"><div className="searchHeading"><span className="eyebrow">RECHERCHE TRANSVERSALE</span><h2 id="search-title">Que souhaitez-vous comprendre ?</h2><p>Interrogez tout le corpus ou choisissez un Pulse pour affiner la réponse.</p></div><form className="searchForm" onSubmit={submit}><span aria-hidden="true">⌕</span><input ref={inputRef} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Posez une question à Corpus Campus PAÏA…" aria-label="Votre question" /><button disabled={loading} aria-label="Lancer la recherche">→</button></form><div className="suggestions"><span>Suggestions</span>{examples.map((item) => <button key={item} onClick={() => { setQuery(item); inputRef.current?.focus(); }}>{item}</button>)}</div>{pulse && <div className="activeFilter">Pulse : <b>{pulse}</b><button onClick={clearPulse} aria-label="Retirer le filtre">×</button></div>}{loading && <div className="searchLoading" role="status"><i /><div><b>Recherche dans vos ressources privées…</b><span>Corpus Campus PAÏA rassemble les extraits pertinents et prépare une réponse structurée.</span></div></div>}{error && <p className="searchError" role="alert">{error}</p>}{!answer && !loading && <p className="emptyHint">Votre réponse apparaîtra ici, accompagnée des ressources qui l’ont alimentée.</p>}</section>;
 }
 
-function Pulses({ onSelect }: { onSelect: (pulse: string) => void }) {
-  return (
-    <section className="pulseSection shell" id="pulses">
-      <div className="sectionTitle"><div><span className="pulseBolt">ϟ</span><h2>Les Pulse</h2><p>Explorez par domaine pour affiner votre recherche.</p></div><a href="#pulses">Voir tous les domaines →</a></div>
-      <div className="pulseGrid">{pulses.map(([name, description, icon], index) => <button className={`pulseCard ${pulseStyles[index]}`} key={name} onClick={() => onSelect(name)}><span className="pulseIcon">{icon}</span><b>{name}</b><p>{description}</p><i>→</i></button>)}</div>
-    </section>
-  );
+function Pulses({ onSelect }: { onSelect: (name: string) => void }) {
+  return <section className="pulseSection shell" aria-labelledby="pulse-title"><div className="sectionTitle"><div><span className="pulseBolt">ϟ</span><div><h2 id="pulse-title">Explorer par Pulse</h2><p>Un filtre facultatif : la recherche reste toujours transversale.</p></div></div></div><div className="pulseGrid">{pulses.map(([name, description, icon]) => <button className="pulseCard" key={name} onClick={() => onSelect(name)}><span className="pulseIcon">{icon}</span><b>{name}</b><p>{description}</p><i>Choisir →</i></button>)}</div></section>;
 }
 
-function Shortcuts() {
-  const items = [["◈", "Explorer les formations", "Par projet, bloc, module et ressource", "#explorer", "Accéder à l’explorateur"], ["▤", "Découvrir les énoncés", "S’entraîner et structurer son raisonnement", "#fiche", "Accéder aux énoncés"], ["★", "Vos favoris", "Retrouvez vos fiches et réponses", "#favoris", "Voir mes favoris"]];
-  return <section className="shortcuts shell" id="enonces">{items.map(([icon, title, description, href, label], index) => <article key={title}><span className={`shortcutIcon c${index}`}>{icon}</span><div><h3>{title}</h3><p>{description}</p><a href={href}>{label}　→</a></div></article>)}</section>;
+function Explorer({ onOpen, onFavorite }: { onOpen: (resource: CatalogResource) => void; onFavorite: (favorite: Favorite) => void }) {
+  const [resources, setResources] = useState<CatalogResource[]>([]); const [loading, setLoading] = useState(true); const [connected, setConnected] = useState(true);
+  const [formation, setFormation] = useState(""); const [block, setBlock] = useState(""); const [module, setModule] = useState("");
+  useEffect(() => { fetch("/api/catalog").then(async (response) => { const data = await response.json(); setResources(data.resources ?? []); setConnected(Boolean(data.connected)); }).catch(() => setConnected(false)).finally(() => setLoading(false)); }, []);
+  const formations = useMemo(() => [...new Set(resources.map((r) => r.formation))].sort(), [resources]);
+  const filteredFormation = resources.filter((r) => r.formation === formation);
+  const blocks = [...new Map(filteredFormation.map((r) => [r.blockCode || r.blockTitle, `${r.blockCode}${r.blockCode && r.blockTitle ? " — " : ""}${r.blockTitle}`])).entries()];
+  const filteredBlock = filteredFormation.filter((r) => (r.blockCode || r.blockTitle) === block);
+  const modules = [...new Map(filteredBlock.map((r) => [r.moduleCode || r.moduleTitle, `${r.moduleCode}${r.moduleCode && r.moduleTitle ? " — " : ""}${r.moduleTitle}`])).entries()];
+  const visible = filteredBlock.filter((r) => (r.moduleCode || r.moduleTitle) === module);
+  const resetAfter = (level: "formation" | "block") => { if (level === "formation") { setBlock(""); setModule(""); } else setModule(""); };
+  return <section className="explorer shell" id="explorer"><header><span className="overline">VOTRE BIBLIOTHÈQUE PRIVÉE</span><h2>Explorer les ressources</h2><p>Un parcours dynamique, construit à partir des métadonnées du corpus.</p></header><div className="steps" aria-label="Progression"><span className="ready"><b>1</b>Formation</span><span className={formation ? "ready" : ""}><b>2</b>Bloc</span><span className={block ? "ready" : ""}><b>3</b>Module</span><span className={module ? "ready" : ""}><b>4</b>Ressource</span></div><div className="explorerCard">{loading ? <div className="catalogState"><i /><h3>Chargement du catalogue…</h3><p>Les formations sont récupérées depuis le corpus.</p></div> : !connected ? <div className="catalogState"><h3>Catalogue non connecté</h3><p>Connectez le service de lecture du corpus pour afficher les formations réelles. Aucune liste fictive n’est utilisée.</p></div> : !resources.length ? <div className="catalogState"><h3>Aucune ressource disponible</h3><p>Le catalogue ne contient pas encore de ressource consultable.</p></div> : <><label>Formation<select value={formation} onChange={(e) => { setFormation(e.target.value); resetAfter("formation"); }}><option value="">Choisir une formation</option>{formations.map((item) => <option key={item}>{item}</option>)}</select></label>{formation && <label>Bloc<select value={block} onChange={(e) => { setBlock(e.target.value); resetAfter("block"); }}><option value="">Choisir un bloc</option>{blocks.map(([key, label]) => <option value={key} key={key}>{label}</option>)}</select></label>}{block && <label>Module<select value={module} onChange={(e) => setModule(e.target.value)}><option value="">Choisir un module</option>{modules.map(([key, label]) => <option value={key} key={key}>{label}</option>)}</select></label>}{module && <div className="resourceGrid">{visible.map((resource) => <article key={resource.resourceCode}><span>{resource.resourceType}</span><h3>{resource.title}</h3><p>{resource.resourceCode}{resource.pulse ? ` · ${resource.pulse}` : ""}</p><div><button onClick={() => onOpen(resource)}>Consulter la fiche</button><button aria-label={`Ajouter ${resource.title} aux favoris`} onClick={() => onFavorite({ kind: "resource", code: resource.resourceCode, title: resource.title })}>♡</button></div></article>)}</div>}</>}</div></section>;
 }
 
-function Explorer() {
-  const [formation, setFormation] = useState<Formation | "">("");
-  const [bloc, setBloc] = useState(""); const [module, setModule] = useState(""); const [resource, setResource] = useState("");
-  const tree = formation ? formations[formation] as Record<string, Record<string, readonly string[]>> : null;
-  const blocks = tree ? Object.keys(tree) : [];
-  const modules = tree && bloc ? Object.keys(tree[bloc] ?? {}) : [];
-  const resources = useMemo(() => tree && bloc && module ? tree[bloc]?.[module] ?? [] : [], [tree, bloc, module]);
-  const Choice = ({ title, items, onPick, back }: { title: string; items: readonly string[]; onPick: (item: string) => void; back?: () => void }) => <div className="choicePanel">{back && <button className="backButton" onClick={back}>← Étape précédente</button>}<h3>{title}</h3><div>{items.map((item) => <button key={item} onClick={() => onPick(item)}><span>▣</span>{item}<b>→</b></button>)}</div></div>;
-  return (
-    <section className="explorer shell" id="explorer">
-      <header><span className="overline">VOTRE BIBLIOTHÈQUE PRIVÉE</span><h2>Explorer les ressources</h2><p>Progressez pas à pas, de la formation jusqu’à la ressource.</p></header>
-      <div className="steps">{["Formation", "Bloc", "Module", "Ressource"].map((name, index) => <span className={(index === 0 || index === 1 && formation || index === 2 && bloc || index === 3 && module) ? "ready" : ""} key={name}><b>{index + 1}</b>{name}</span>)}</div>
-      <div className="explorerCard">
-        {!formation && <Choice title="Choisissez une formation" items={Object.keys(formations)} onPick={(item) => setFormation(item as Formation)} />}
-        {formation && !bloc && <Choice title="Choisissez un bloc" items={blocks} onPick={setBloc} back={() => setFormation("")} />}
-        {formation && bloc && !module && <Choice title="Choisissez un module" items={modules} onPick={setModule} back={() => setBloc("")} />}
-        {formation && bloc && module && !resource && <Choice title="Choisissez une ressource" items={resources} onPick={setResource} back={() => setModule("")} />}
-        {resource && <div className="resourceResult"><button className="backButton" onClick={() => setResource("")}>← Retour aux ressources</button><p>{formation}　/　{bloc}　/　{module}</p><h3>{resource}</h3><small>Référence interne · CPA-{String(resource.length).padStart(3, "0")}</small><div><button>Résumer cette ressource</button><button>Points à maîtriser</button></div></div>}
-      </div>
-    </section>
-  );
+function ResourceCards({ resources }: { resources: ResourceRecommendation[] }) {
+  return <section className="sourcesBlock" id="sources"><div className="sectionIntro"><span>RESSOURCES INTERNES</span><h2>Ce qui a alimenté la réponse</h2><p>Seules les métadonnées utiles sont affichées. Aucun lien privé ni identifiant sensible n’est exposé.</p></div><div className="sourceGrid">{resources.map((resource) => <article key={resource.resourceCode}><div className="sourceTop"><span>{resource.resourceType || "Ressource"}</span><code>{resource.resourceCode}</code></div><h3>{resource.title}</h3><dl><div><dt>Formation</dt><dd>{resource.formation || "Non renseignée"}</dd></div><div><dt>Bloc</dt><dd>{[resource.blockCode, resource.blockTitle].filter(Boolean).join(" — ") || "Non renseigné"}</dd></div><div><dt>Module</dt><dd>{[resource.moduleCode, resource.moduleTitle].filter(Boolean).join(" — ") || "Non renseigné"}</dd></div></dl><p>{resource.reason}</p><button disabled title="Nécessite le futur service d’accès sécurisé">Ouvrir la ressource <small>Accès sécurisé à connecter</small></button></article>)}</div></section>;
 }
 
-function KnowledgeSheet({ answer }: { answer: Answer | null }) {
-  const [favorite, setFavorite] = useState(false);
-  useEffect(() => setFavorite(localStorage.getItem("favorite-dsn") === "1"), []);
-  const text = answer?.summary || "La DSN est un flux déclaratif mensuel transmis par les employeurs à partir des données de paie. Elle permet de communiquer aux organismes sociaux les informations nécessaires à la gestion des droits et au calcul des cotisations.";
-  const toggleFavorite = () => { const next = !favorite; setFavorite(next); localStorage.setItem("favorite-dsn", next ? "1" : "0"); };
-  const listen = () => { speechSynthesis.cancel(); const utterance = new SpeechSynthesisUtterance(text); utterance.lang = "fr-FR"; speechSynthesis.speak(utterance); };
-  const contents = ["En 30 secondes", "Comprendre vraiment", "Ce que dit la formation", "Mise à jour & veille", "Cas pratique", "Le réflexe pro", "Glossaire", "Sources", "À retenir"];
-  return (
-    <section className="sheetSection" id="fiche">
-      <div className="shell"><h2>Aperçu d’une fiche Campus PAÏA</h2><div className="sheetLayout">
-        <aside className="sheetToc"><b>Sommaire</b>{contents.map((item, index) => <a className={index === 0 ? "active" : ""} href={`#part-${index}`} key={item}><span>{index === 0 ? "⊞" : "◉"}</span>{item}</a>)}<button onClick={() => window.print()}>▣　Imprimer</button></aside>
-        <article className="knowledgeCard"><div className="domainRail">PAIE & SOCIAL</div><div className="knowledgeBody">
-          <header><div><h1>{answer?.title || "DSN — Comprendre la déclaration sociale nominative"}</h1><p>De la logique déclarative au contrôle des données sociales</p></div><Image src="/brand/02_PAIA_Circulaire_Logo_Compact.png" width={124} height={124} alt="Logo officiel PAÏA" /></header>
-          <div className="sheetMeta"><span>◆　Pulse Paie & Social</span><span>◷　Lecture : 7 min</span><span>▣　Vérifié le 21/09/2026</span><button onClick={toggleFavorite}>{favorite ? "★ Favori" : "☆ Ajouter"}</button></div>
-          <div className="reference"><b>▤　Référence pédagogique</b><p>Gestionnaire de Paie · Administration de la paie<br />Module 4 — Les déclarations sociales<br />Accès Studi : retrouvez cette ressource dans votre médiathèque avec votre code interne.</p></div>
-          <section className="thirty" id="part-0"><h3>🎯　En 30 secondes</h3><p>{text}</p><small>Source recommandée : documentation officielle en vigueur.</small></section>
-          {answer?.resources && answer.resources.length > 0 && <section className="helpfulResources" aria-labelledby="helpful-resources-title"><h3 id="helpful-resources-title">Ressources qui peuvent vous aider</h3><div>{answer.resources.map((resource) => <article key={resource.resourceCode}><header><span>{resource.resourceType || "Ressource"}</span><b>{resource.title}</b></header><p><strong>{resource.formation}</strong><br />{resource.blockCode} — {resource.blockTitle}<br />{resource.moduleCode} — {resource.moduleTitle}</p><small>{resource.reason}</small></article>)}</div></section>}
-          <section id="part-1"><h3>Comprendre vraiment</h3><p>Chaque événement individuel devient une donnée structurée. La fiabilité de la déclaration dépend donc directement de la qualité des informations et des contrôles de paie.</p></section>
-          <section className="watch" id="part-3"><h3>Mise à jour & veille</h3><p>Le cours pose le cadre pédagogique. Les dates, règles et paramètres opérationnels doivent toujours être confirmés auprès d’une source officielle actuelle.</p></section>
-          <section id="part-4"><h3>Cas pratique</h3><p>Une absence saisie après la clôture peut produire une donnée incohérente. Contrôlez l’événement, sa période de rattachement et son impact avant l’envoi.</p></section>
-        </div></article>
-        <aside className="readingTools"><b>Outils de lecture</b><button onClick={listen}>🔊　Écouter la fiche</button><ThemeToggle /><button>🇫🇷　Français　⌄</button><button>🇬🇧　Traduire en anglais</button><button onClick={() => window.print()}>▣　Imprimer (PDF)</button><div className="tip"><strong>Le conseil de Pia 🌱</strong><p>« Une règle comprise aujourd’hui, c’est une hésitation de moins demain. »</p></div></aside>
-      </div></div>
-    </section>
-  );
+function KnowledgeSheet({ answer, selected, onFavorite }: { answer: Answer | null; selected: CatalogResource | null; onFavorite: (favorite: Favorite) => void }) {
+  if (!answer && !selected) return null;
+  const title = answer?.title || selected?.title || "Ressource"; const summary = answer?.summary;
+  const resources = answer?.resources ?? (selected ? [{ ...selected, reason: "Ressource sélectionnée depuis le catalogue." }] : []);
+  return <section className="sheetSection" id="fiche"><div className="sheetShell shell"><aside className="sheetToc" aria-label="Sommaire"><b>Dans cette fiche</b><a href="#synthese">Synthèse</a>{resources.length > 0 && <a href="#sources">Sources</a>}<a href="#veille">Mise à jour & veille</a></aside><article className="knowledgeCard"><header className="printHeader"><div><span className="eyebrow">FICHE CORPUS</span><h1>{title}</h1>{selected && <p>{[selected.formation, selected.blockTitle, selected.moduleTitle].filter(Boolean).join(" · ")}</p>}</div><Image src="/brand/02_PAIA_Circulaire_Logo_Compact.png" width={92} height={92} alt="Corpus Campus PAÏA" /></header><div className="sheetActions"><button onClick={() => onFavorite({ kind: answer ? "answer" : "resource", code: selected?.resourceCode || title, title })}>♡ Ajouter aux favoris</button><button onClick={() => window.print()}>▣ Imprimer / PDF</button></div><section className="synthesis" id="synthese"><span>SYNTHÈSE</span>{summary ? <div className="answerText">{summary}</div> : <p>Cette fiche présente les métadonnées disponibles pour la ressource sélectionnée. Lancez une recherche pour obtenir une explication fondée sur son contenu.</p>}</section>{resources.length > 0 && <ResourceCards resources={resources} />}<section className="watch" id="veille"><span>MISE À JOUR & VEILLE</span><h2>Statut de vérification</h2><div className="watchGrid"><div><b>Document d’origine</b><p>{selected?.resourceCode ? `Référence interne ${selected.resourceCode}.` : "Les ressources citées ci-dessus constituent la base de cette réponse."}</p></div><div><b>Actualité de l’information</b><p>À vérifier — aucun service de vérification externe n’est connecté à cette interface.</p></div><div><b>Sources officielles externes</b><p>Aucune vérification Internet n’est revendiquée.</p></div></div></section></article><aside className="readingTools"><b>Outils</b><button onClick={() => window.print()}>Imprimer la fiche</button><a href="#recherche">Poser une autre question</a></aside></div></section>;
 }
 
-function WhyPaia() {
-  return <section className="why shell" id="apropos"><h2><Image src="/brand/04_PAIA_Circulaire_Icone.png" width={48} height={48} alt="" />Pourquoi Campus PAÏA ?</h2><div><p><b>✓　Des réponses issues de vos cours</b><span>Croisées avec les sources officielles.</span></p><p><b>◎　Une veille actualisée</b><span>Réglementaire, sociale, numérique…</span></p><p><b>♧　Des explications concrètes</b><span>Avec exemples et cas pratiques.</span></p><p><b>♡　Une touche positive</b><span>Parce qu’apprendre peut être motivant !</span></p></div></section>;
+function Favorites({ favorites, remove }: { favorites: Favorite[]; remove: (code: string) => void }) {
+  return <section className="favorites shell" id="favoris"><div className="sectionIntro"><span>VOTRE SÉLECTION</span><h2>Favoris</h2><p>Ressources et réponses restent disponibles sur cet appareil.</p></div>{favorites.length ? <div className="favoriteGrid">{favorites.map((item) => <article key={`${item.kind}-${item.code}`}><small>{item.kind === "resource" ? "Ressource" : "Réponse"}</small><h3>{item.title}</h3><code>{item.code}</code><button onClick={() => remove(item.code)}>Retirer</button></article>)}</div> : <div className="emptyState"><span>♡</span><h3>Votre sélection est vide</h3><p>Ajoutez une ressource réelle ou une réponse pour la retrouver ici.</p></div>}</section>;
 }
+
+function About() { return <section className="about shell" id="apropos"><Image src="/brand/04_PAIA_Circulaire_Icone.png" width={72} height={72} alt="" /><div><span className="overline">À PROPOS</span><h2>Une connaissance privée, mieux mobilisée.</h2><p>Corpus Campus PAÏA relie recherche intelligente, ressources personnelles structurées et accompagnement par IA. Il restitue ce que contient votre corpus sans exposer vos documents privés.</p></div></section>; }
+
+function Pia({ focusSearch }: { focusSearch: () => void }) { const [open, setOpen] = useState(false); return <div className="piaDock">{open && <div className="piaPanel"><strong>Bonjour, je suis Pia.</strong><p>Je peux vous guider dans votre corpus.</p><button onClick={focusSearch}>Poser une question</button><a href="#explorer">Explorer les ressources</a><a href="#apropos">Consulter l’aide</a></div>}<button className="piaTrigger" onClick={() => setOpen(!open)} aria-expanded={open} aria-label="Ouvrir l’assistance Pia"><span className="piaMini" aria-hidden="true" /><span><b>Pia</b><small>Votre compagne de recherche</small></span></button></div>; }
 
 export default function CampusApp() {
-  const [answer, setAnswer] = useState<Answer | null>(null);
-  const [pulse, setPulse] = useState("");
-  const selectPulse = (name: string) => { setPulse(name); document.querySelector(".searchArea")?.scrollIntoView({ behavior: "smooth", block: "center" }); };
-  return <><Header /><main><Hero /><Search answer={answer} setAnswer={setAnswer} pulse={pulse} clearPulse={() => setPulse("")} /><Pulses onSelect={selectPulse} /><Shortcuts /><WhyPaia /><Explorer /><KnowledgeSheet answer={answer} /><div id="favoris" /></main><footer><div className="shell"><Brand compact /><p>🌱 Apprendre. Comprendre. Progresser. Ensemble.</p><span>Campus PAÏA · Septembre 2026</span><Image src="/brand/03_MMPA_Circulaire_Logo.png" width={56} height={56} alt="Logo officiel MMPA" /></div></footer><PiaAssistant /></>;
+  const [answer, setAnswer] = useState<Answer | null>(null); const [selected, setSelected] = useState<CatalogResource | null>(null); const [pulse, setPulse] = useState(""); const [favorites, setFavorites] = useState<Favorite[]>([]); const inputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => { try { setFavorites(JSON.parse(localStorage.getItem("corpus-campus-favorites") || "[]")); } catch { setFavorites([]); } }, []);
+  const persist = (items: Favorite[]) => { setFavorites(items); localStorage.setItem("corpus-campus-favorites", JSON.stringify(items)); };
+  const addFavorite = (item: Favorite) => persist([...favorites.filter((favorite) => favorite.code !== item.code), item]);
+  const focusSearch = () => { setTimeout(() => inputRef.current?.focus(), 50); document.querySelector("#recherche")?.scrollIntoView({ behavior: "smooth" }); };
+  return <><Header /><main><Hero /><Search answer={answer} setAnswer={(value) => { setAnswer(value); setSelected(null); }} pulse={pulse} clearPulse={() => setPulse("")} inputRef={inputRef} /><Pulses onSelect={(name) => { setPulse(name); focusSearch(); }} /><Explorer onOpen={(resource) => { setSelected(resource); setAnswer(null); setTimeout(() => document.querySelector("#fiche")?.scrollIntoView({ behavior: "smooth" }), 50); }} onFavorite={addFavorite} /><KnowledgeSheet answer={answer} selected={selected} onFavorite={addFavorite} /><Favorites favorites={favorites} remove={(code) => persist(favorites.filter((item) => item.code !== code))} /><About /></main><footer><div className="shell"><Brand compact /><p>Apprendre. Comprendre. Progresser.</p><span>Corpus Campus PAÏA</span><Image src="/brand/03_MMPA_Circulaire_Logo.png" width={56} height={56} alt="Logo MMPA" /></div></footer><Pia focusSearch={focusSearch} /></>;
 }
