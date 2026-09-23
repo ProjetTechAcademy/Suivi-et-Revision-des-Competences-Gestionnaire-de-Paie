@@ -26,7 +26,7 @@ function Header() {
     <header className="siteHeader">
       <div className="headerInner shell">
         <a href="#accueil" aria-label="Campus PAÏA — Accueil"><Brand /></a>
-        <button className="menuButton" onClick={() => setOpen(!open)} aria-expanded={open} aria-label="Ouvrir le menu">☰</button>
+        <button className="menuButton" onClick={() => setOpen(!open)} aria-expanded={open} aria-label={open ? "Fermer le menu" : "Ouvrir le menu"}>☰</button>
         <nav className={open ? "mainNav open" : "mainNav"} aria-label="Navigation principale">
           <a className="active" href="#accueil">⌂ <span>Accueil</span></a>
           <a href="#explorer">◉ <span>Explorer</span></a>
@@ -45,9 +45,7 @@ function Header() {
 }
 
 function PiaAssistant() {
-  const [bubble, setBubble] = useState(true);
   const [panel, setPanel] = useState(false);
-  useEffect(() => { const timer = window.setTimeout(() => setBubble(false), 9000); return () => clearTimeout(timer); }, []);
   const speech = (action: "play" | "pause" | "resume" | "stop") => {
     if (!("speechSynthesis" in window)) return;
     if (action === "pause") return speechSynthesis.pause();
@@ -60,9 +58,8 @@ function PiaAssistant() {
   };
   return (
     <div className="piaDock">
-      {bubble && <div className="piaBubble" role="status"><button onClick={() => setBubble(false)} aria-label="Fermer la bulle de Pia">×</button><b>Bonjour !</b><p>Je suis Pia, votre compagne de recherche. Posez-moi une question ou explorez un Pulse !</p></div>}
       {panel && <div className="piaPanel"><strong>Comment puis-je vous aider ?</strong><a href="#explorer">Explorer une ressource</a><a href="#pulses">Choisir un Pulse</a><button onClick={() => speech("play")}>▷ Lire mon message</button><div><button onClick={() => speech("pause")}>Pause</button><button onClick={() => speech("resume")}>Reprendre</button><button onClick={() => speech("stop")}>Arrêter</button></div></div>}
-      <button className="piaTrigger" onClick={() => { setBubble(false); setPanel(!panel); }} aria-expanded={panel}><span className="piaMini" aria-hidden="true" /><span><b>Pia</b><small>Compagne de recherche</small></span></button>
+      <button className="piaTrigger" onClick={() => setPanel(!panel)} aria-expanded={panel} aria-label={panel ? "Fermer l’assistance Pia" : "Ouvrir l’assistance Pia"}><span className="piaMini" aria-hidden="true" /><span><b>Pia</b><small>Compagne de recherche</small></span></button>
     </div>
   );
 }
@@ -82,10 +79,6 @@ function Hero() {
           <i className="orbit orbitOne" /><i className="orbit orbitTwo" />
           <div className="logoDisc"><Image src="/brand/01_PAIA_Circulaire_Logo_Principal.png" width={1080} height={1080} alt="Logo officiel PAÏA" priority /></div>
           <span className="orbitLabel">SAVOIR · PRATIQUER · ÉVOLUER</span>
-        </div>
-        <div className="piaHero">
-          <div className="piaCrop" role="img" aria-label="Pia, la mascotte officielle de Campus PAÏA"><Image src="/reference/image_1.png" width={1312} height={1199} alt="" priority /></div>
-          <div className="heroBubble"><b>Bonjour !</b><span>Je suis Pia, votre compagne de recherche.</span><small>Une question ? On explore ensemble !</small></div>
         </div>
       </div>
     </section>
