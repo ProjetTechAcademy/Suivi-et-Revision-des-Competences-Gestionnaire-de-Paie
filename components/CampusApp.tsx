@@ -20,6 +20,61 @@ type Favorite = { code: string; title: string; kind: "resource" | "answer" | "re
 
 const pulseNames = ["Paie & Social", "RH", "SIRH", "Droit social", "AMOA & Projet", "Management", "Digital & IA", "Tech"];
 
+type PickerName = "parcours" | "block" | "module";
+type PickerChoice = [string, string];
+
+const naturalCollator = new Intl.Collator("fr", { numeric: true, sensitivity: "base" });
+const naturalSort = (a: string, b: string) => naturalCollator.compare(a, b);
+
+function PickerSelect({
+  name,
+  label,
+  value,
+  options,
+  placeholder,
+  disabled,
+  openName,
+  setOpenName,
+  onChange,
+}: {
+  name: PickerName;
+  label: string;
+  value: string;
+  options: PickerChoice[];
+  placeholder: string;
+  disabled?: boolean;
+  openName: PickerName | null;
+  setOpenName: (name: PickerName | null) => void;
+  onChange: (value: string) => void;
+}) {
+  const selected = options.find(([key]) => key === value);
+  const open = openName === name;
+
+  return <div className={`pickerField ${disabled ? "disabled" : ""}`}>
+    <span className="pickerLabel">{label}</span>
+    <button
+      type="button"
+      className="pickerButton"
+      disabled={disabled}
+      aria-expanded={open}
+      onClick={() => setOpenName(open ? null : name)}
+    >
+      <span className={`pickerButtonText ${selected ? "" : "placeholder"}`}>{selected?.[1] || placeholder}</span>
+      <span className="pickerChevron" aria-hidden="true">⌄</span>
+    </button>
+    {open && <div className="pickerMenu" role="listbox" aria-label={label}>
+      {options.map(([key, optionLabel]) => <button
+        type="button"
+        key={key}
+        className={key === value ? "active" : ""}
+        onClick={() => { onChange(key); setOpenName(null); }}
+      >
+        <span>{optionLabel}</span>
+      </button>)}
+    </div>}
+  </div>;
+}
+
 function Brand({ locale }: { locale: Locale }) {
   return <span className="brand"><Image src="/brand/02_PAIA_Circulaire_Logo_Compact.png" width={54} height={54} alt="Logo PAÏA" /><span><strong>Corpus Campus PAÏA</strong><small>{copy[locale].brandTagline}</small></span></span>;
 }
@@ -178,17 +233,51 @@ function ResourcePicker({ locale, mode, ownerKey, setOwnerKey, saveFavorite }: {
   const [message, setMessage] = useState("");
   const [revision, setRevision] = useState<Revision | null>(null);
   const [generating, setGenerating] = useState("");
+  const [openPicker, setOpenPicker] = useState<PickerName | null>(null);
 
   useEffect(() => {
     fetch("/api/catalog").then((r) => r.json()).then((data) => setResources(data.resources ?? [])).catch(() => setMessage("Catalogue indisponible.")).finally(() => setLoading(false));
   }, []);
 
-  const parcoursList = useMemo(() => [...new Set(resources.map((r) => r.formation).filter(Boolean))].sort(), [resources]);
-  const byParcours = resources.filter((r) => r.formation === parcours);
-  const blocks = [...new Map(byParcours.map((r) => [r.blockCode || r.blockTitle, `${r.blockCode}${r.blockCode && r.blockTitle ? " — " : ""}${r.blockTitle}`])).entries()];
-  const byBlock = byParcours.filter((r) => (r.blockCode || r.blockTitle) === block);
-  const modules = [...new Map(byBlock.map((r) => [r.moduleCode || r.moduleTitle, `${r.moduleCode}${r.moduleCode && r.moduleTitle ? " — " : ""}${r.moduleTitle}`])).entries()];
-  const visible = byBlock.filter((r) => (r.moduleCode || r.moduleTitle) === module);
+  const parcoursList = useMemo(
+    () => [...new Set(resources.map((r) => r.formation).filter(Boolean))].sort(naturalSort),
+    [resources]
+  );
+
+  const blocks = useMemo<PickerChoice[]>(() => {
+    const map = new Map<string, string>();
+    resources
+      .filter((r) => r.formation === parcours)
+      .forEach((r) => {
+        const key = r.blockCode || r.blockTitle;
+        if (!key) return;
+        map.set(key, `${r.blockCode}${r.blockCode && r.blockTitle ? " — " : ""}${r.blockTitle}`);
+      });
+    return [...map.entries()].sort((a, b) => naturalSort(a[0], b[0]) || naturalSort(a[1], b[1]));
+  }, [resources, parcours]);
+
+  const modules = useMemo<PickerChoice[]>(() => {
+    const map = new Map<string, string>();
+    resources
+      .filter((r) => r.formation === parcours && (r.blockCode || r.blockTitle) === block)
+      .forEach((r) => {
+        const key = r.moduleCode || r.moduleTitle;
+        if (!key) return;
+        map.set(key, `${r.moduleCode}${r.moduleCode && r.moduleTitle ? " — " : ""}${r.moduleTitle}`);
+      });
+    return [...map.entries()].sort((a, b) => naturalSort(a[0], b[0]) || naturalSort(a[1], b[1]));
+  }, [resources, parcours, block]);
+
+  const visible = useMemo(
+    () => resources
+      .filter((r) =>
+        r.formation === parcours &&
+        (r.blockCode || r.blockTitle) === block &&
+        (r.moduleCode || r.moduleTitle) === module
+      )
+      .sort((a, b) => naturalSort(a.resourceCode, b.resourceCode) || naturalSort(a.title, b.title)),
+    [resources, parcours, block, module]
+  );
 
   const openDocument = async (resource: CatalogResource | ResourceRecommendation) => {
     let key = ownerKey;
@@ -215,23 +304,51 @@ function ResourcePicker({ locale, mode, ownerKey, setOwnerKey, saveFavorite }: {
   };
 
   return <section className="toolPanel">
-    <header className="panelIntro"><span className="eyebrow">{mode === "documents" ? "BIBLIOTHÈQUE" : "FICHE PIA"}</span><h2>{t.explorerTitle}</h2><p>{t.explorerText}</p></header>
+    <header className="panelIntro"><span className="eyebrow">{mode === "documents" ? "BIBLIOTHÈQUE" : "FICHE PAÏA"}</span><h2>{t.explorerTitle}</h2><p>{t.explorerText}</p></header>
     {loading ? <p className="notice">{t.loading}</p> : <>
       <div className="pickerGrid">
-        <label>{t.parcours}<select value={parcours} onChange={(e) => { setParcours(e.target.value); setBlock(""); setModule(""); }}><option value="">{t.chooseParcours}</option>{parcoursList.map((item) => <option key={item}>{item}</option>)}</select></label>
-        <label className={!parcours ? "disabled" : ""}>{t.block}<select disabled={!parcours} value={block} onChange={(e) => { setBlock(e.target.value); setModule(""); }}><option value="">{t.chooseBlock}</option>{blocks.map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
-        <label className={!block ? "disabled" : ""}>{t.module}<select disabled={!block} value={module} onChange={(e) => setModule(e.target.value)}><option value="">{t.chooseModule}</option>{modules.map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
+        <PickerSelect
+          name="parcours"
+          label={t.parcours}
+          value={parcours}
+          options={parcoursList.map((item) => [item, item])}
+          placeholder={t.chooseParcours}
+          openName={openPicker}
+          setOpenName={setOpenPicker}
+          onChange={(value) => { setParcours(value); setBlock(""); setModule(""); }}
+        />
+        <PickerSelect
+          name="block"
+          label={t.block}
+          value={block}
+          options={blocks}
+          placeholder={t.chooseBlock}
+          disabled={!parcours}
+          openName={openPicker}
+          setOpenName={setOpenPicker}
+          onChange={(value) => { setBlock(value); setModule(""); }}
+        />
+        <PickerSelect
+          name="module"
+          label={t.module}
+          value={module}
+          options={modules}
+          placeholder={t.chooseModule}
+          disabled={!block}
+          openName={openPicker}
+          setOpenName={setOpenPicker}
+          onChange={setModule}
+        />
       </div>
       {module && <div className="resourceList">{visible.length ? visible.map((resource) => <div className="resourceRow" key={resource.resourceCode}><span className="resourceType">{resource.resourceType}</span><code>{resource.resourceCode}</code><strong>{resource.title}</strong><span className="rowActions">
         <button className="ghost" onClick={() => saveFavorite({ kind: "resource", code: resource.resourceCode, title: resource.title })}>♡</button>
-        {mode === "documents" && resource.hasPrivateDocument && <button onClick={() => openDocument(resource)}>{t.openDocument}</button>}
-        
+        {mode === "documents" && resource.hasPrivateDocument && <button onClick={() => openDocument(resource)}>{locale === "fr" ? "Ouvrir" : "Open"}</button>}
         {mode === "documents" && !resource.hasPrivateDocument && <small>{t.sourceNotLinked}</small>}
-        <button className="primary" onClick={() => generateRevision(resource)} disabled={generating === resource.resourceCode}>{generating === resource.resourceCode ? t.generatingRevision : t.generateRevision}</button>
+        <button className="primary" onClick={() => generateRevision(resource)} disabled={generating === resource.resourceCode}>{generating === resource.resourceCode ? "…" : (locale === "fr" ? "Fiche PAÏA" : "PAÏA Sheet")}</button>
       </span></div>) : <p className="notice">{t.noResources}</p>}</div>}
     </>}
     {message && <p className="notice error">{message}</p>}
-    {revision && <article className="resultSheet revisionSheet" id="revision-result"><header><span className="eyebrow">FICHE PIA</span><h2>{revision.title}</h2><div><code>{revision.resourceCode}</code><button onClick={() => saveFavorite({ kind: "revision", code: revision.resourceCode, title: revision.title })}>♡ {t.favoriteAdd}</button><button onClick={() => window.print()}>▣ {t.print}</button></div></header><RichText text={revision.content} /></article>}
+    {revision && <article className="resultSheet revisionSheet" id="revision-result"><header><span className="eyebrow">FICHE PAÏA</span><h2>{revision.title}</h2><div><code>{revision.resourceCode}</code><button onClick={() => saveFavorite({ kind: "revision", code: revision.resourceCode, title: revision.title })}>♡ {t.favoriteAdd}</button><button onClick={() => window.print()}>▣ {t.print}</button></div></header><RichText text={revision.content} /></article>}
   </section>;
 }
 
@@ -242,13 +359,13 @@ function FavoritesPanel({ locale, favorites, remove }: { locale: Locale; favorit
 
 function AboutPanel({ locale }: { locale: Locale }) {
   const t = copy[locale];
-  return <section className="toolPanel aboutPanel"><img src={piaImages.default} alt="Pia, mascotte de Corpus Campus PAÏA" /><div><span className="eyebrow">À PROPOS</span><h2>{t.aboutTitle}</h2><p>{t.aboutText}</p></div></section>;
+  return <section className="toolPanel aboutPanel"><img src={piaImages.default} alt="Païa, mascotte de Corpus Campus PAÏA" /><div><span className="eyebrow">À PROPOS</span><h2>{t.aboutTitle}</h2><p>{t.aboutText}</p></div></section>;
 }
 
 function PiaDock({ locale, inputRef }: { locale: Locale; inputRef: RefObject<HTMLInputElement | null> }) {
   const [open, setOpen] = useState(false);
   const t = copy[locale];
-  return <div className="piaDock">{open && <div className="piaBubble"><strong>Pia</strong><p>{locale === "fr" ? "Je reste disponible pendant que vous travaillez." : "I stay available while you work."}</p><button onClick={() => { inputRef.current?.focus(); setOpen(false); }}>{locale === "fr" ? "Poser une question" : "Ask a question"}</button></div>}<button className="piaTrigger" onClick={() => setOpen(!open)}><img src={piaImages.default} alt="Pia" /><span><b>Pia</b><small>{t.piaRole}</small></span></button></div>;
+  return <div className="piaDock">{open && <div className="piaBubble"><strong>Païa</strong><p>{locale === "fr" ? "Je reste disponible pendant que vous travaillez." : "I stay available while you work."}</p><button onClick={() => { inputRef.current?.focus(); setOpen(false); }}>{locale === "fr" ? "Poser une question" : "Ask a question"}</button></div>}<button className="piaTrigger" onClick={() => setOpen(!open)}><img src={piaImages.default} alt="Païa" /><span><b>Païa</b><small>{t.piaRole}</small></span></button></div>;
 }
 
 export default function CampusApp() {
@@ -284,7 +401,7 @@ export default function CampusApp() {
   return <>
     <Header locale={locale} setLocale={setLocale} setMode={setMode} />
     <main>
-      <Hero locale={locale} />
+      {mode === "question" && <Hero locale={locale} />}
       <WorkspaceChooser locale={locale} mode={mode} setMode={setMode} />
       <div className="workspace shell" id="workspace">
         {mode === "question" && <QuestionPanel locale={locale} ownerKey={ownerKey} setOwnerKey={setOwnerKey} saveFavorite={saveFavorite} />}
