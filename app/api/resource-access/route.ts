@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getQdrantResource } from "@/lib/qdrant";
+import { getResourceLinks } from "@/lib/resource-links";
 
 export async function POST(request: NextRequest) {
   let body: { resourceCode?: string; ownerKey?: string };
@@ -9,6 +9,7 @@ export async function POST(request: NextRequest) {
   const resourceCode = String(body.resourceCode || "").trim().slice(0, 256);
   if (!resourceCode) return NextResponse.json({ error: "Code ressource obligatoire" }, { status: 400 });
 
+  const links = getResourceLinks(resourceCode);
   const expected = process.env.CAMPUS_OWNER_ACCESS_KEY || "";
   const supplied = String(body.ownerKey || "");
 
@@ -16,20 +17,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       error: "Pour des raisons de droit d’auteur, le document source n’est pas accessible depuis cet espace.",
       code: "SOURCE_RESTRICTED",
+      platformUrl: links.platform || "",
     }, { status: 403 });
   }
 
-  try {
-    const point = await getQdrantResource(resourceCode);
-    const documentUrl = String(point?.payload?.private_document_url ?? "").trim();
-
-    if (!documentUrl) {
-      return NextResponse.json({ error: "Aucun original Drive n’est associé à cette ressource." }, { status: 404 });
-    }
-
-    return NextResponse.json({ documentUrl });
-  } catch (error) {
-    console.error("Corpus resource access error", error);
-    return NextResponse.json({ error: "Accès à la ressource momentanément indisponible." }, { status: 502 });
+  if (!links.drive) {
+    return NextResponse.json({
+      error: "Aucun original Drive n’est associé à cette ressource.",
+      platformUrl: links.platform || "",
+    }, { status: 404 });
   }
+
+  return NextResponse.json({ documentUrl: links.drive, platformUrl: links.platform || "" });
 }
