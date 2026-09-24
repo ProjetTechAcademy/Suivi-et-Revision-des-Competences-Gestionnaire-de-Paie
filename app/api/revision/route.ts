@@ -1,8 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revisionWithGroq } from "@/lib/groq";
 import { getQdrantResourceChunks } from "@/lib/qdrant";
+import { getResourceLinks } from "@/lib/resource-links";
+import { extractTextFromFile } from "@/lib/file-text";
 
 type Locale = "fr" | "en";
+
+async function fetchSourceText(sourceUrl: string, resourceCode: string) {
+  if (!sourceUrl) return "";
+  const response = await fetch(sourceUrl, {
+    headers: { "User-Agent": "Corpus-Campus-PAIA/1.0" },
+    cache: "no-store",
+  });
+  if (!response.ok) throw new Error(`SOURCE_FETCH_FAILED:${response.status}`);
+  const contentType = response.headers.get("content-type") || "application/pdf";
+  const bytes = await response.arrayBuffer();
+  if (!bytes.byteLength) return "";
+  const file = new File([bytes], `${resourceCode}.pdf`, { type: contentType.includes("pdf") ? "application/pdf" : contentType });
+  return extractTextFromFile(file);
+}
 
 export async function POST(request: NextRequest) {
   let body: { resourceCode?: string; locale?: Locale };
@@ -19,19 +35,31 @@ export async function POST(request: NextRequest) {
 
     const first = hits[0].payload ?? {};
     const title = String(first.title ?? resourceCode);
-    const contexts = hits.map((hit) => String(hit.payload?.content ?? "")).filter(Boolean);
-    const hasSourceText = first.has_source_text === true || contexts.some((item) => /Contenu indexable\s*:/i.test(item));
+    let contexts = hits.map((hit) => String(hit.payload?.content ?? "")).filter(Boolean);
+    let hasSourceText = first.has_source_text === true || contexts.some((item) => /Contenu indexable\s*:/i.test(item));
+
+    if (!hasSourceText) {
+      const links = getResourceLinks(resourceCode);
+      if (links.source) {
+        const extracted = await fetchSourceText(links.source, resourceCode);
+        if (extracted.trim()) {
+          contexts = [extracted];
+          hasSourceText = true;
+        }
+      }
+    }
 
     if (!hasSourceText) {
       return NextResponse.json({
         error: locale === "en"
-          ? "The resource is catalogued, but its private source text is not yet indexed."
-          : "La ressource est bien cataloguée, mais le texte de sa source privée n’est pas encore indexé.",
+          ? "The resource is catalogued, but its source text is not yet readable by the application."
+          : "La ressource est bien cataloguée, mais son contenu source n’est pas encore lisible par l’application.",
         code: "SOURCE_TEXT_MISSING",
       }, { status: 422 });
     }
 
     const content = await revisionWithGroq(resourceCode, title, contexts, locale);
+    const links = getResourceLinks(resourceCode);
     return NextResponse.json({
       title,
       resourceCode,
@@ -39,7 +67,8 @@ export async function POST(request: NextRequest) {
       resource: {
         resourceCode,
         title,
-        hasPrivateDocument: Boolean(String(first.private_document_url ?? "").trim()),
+        platformUrl: links.platform || "",
+        hasPrivateDocument: Boolean(links.drive),
       },
     });
   } catch (error) {
