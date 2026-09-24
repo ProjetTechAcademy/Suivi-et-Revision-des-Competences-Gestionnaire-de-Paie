@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getResourceLinks } from "@/lib/resource-links";
 
 type QdrantPayload = Record<string, string | number | boolean>;
 type QdrantPoint = { payload?: QdrantPayload };
@@ -25,7 +26,7 @@ function publicResource(payload: QdrantPayload): CatalogResource | null {
   const title = text(payload.title);
   const resourceType = text(payload.resource_type);
   if (!resourceCode || !title || payload.reserved === true || resourceType.toUpperCase() === "EMPTY") return null;
-  const platformUrl = text(payload.platform_url);
+  const links = getResourceLinks(resourceCode);
   return {
     resourceCode,
     formation: text(payload.formation) || "Parcours non renseigné",
@@ -36,8 +37,8 @@ function publicResource(payload: QdrantPayload): CatalogResource | null {
     resourceType: resourceType || "Ressource",
     title,
     pulse: text(payload.pulse),
-    ...(platformUrl ? { platformUrl } : {}),
-    hasPrivateDocument: Boolean(text(payload.private_document_url) || text(payload.source_url)),
+    ...(links.platform ? { platformUrl: links.platform } : {}),
+    hasPrivateDocument: Boolean(links.drive),
     hasSourceText: payload.has_source_text === true,
   };
 }
@@ -59,8 +60,7 @@ export async function GET() {
           limit: 256,
           with_payload: [
             "resource_code", "formation", "block_code", "block_title", "module_code", "module_title",
-            "resource_type", "title", "pulse", "reserved", "platform_url", "private_document_url",
-            "source_url", "has_source_text"
+            "resource_type", "title", "pulse", "reserved", "has_source_text"
           ],
           with_vector: false,
           ...(offset !== undefined && offset !== null ? { offset } : {}),
