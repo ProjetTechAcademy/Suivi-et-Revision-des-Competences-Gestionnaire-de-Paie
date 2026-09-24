@@ -26,6 +26,8 @@ export type ResourceRecommendation = Pick<
   "resourceCode" | "formation" | "blockCode" | "blockTitle" | "moduleCode" | "moduleTitle" | "resourceType" | "title"
 > & {
   reason: string;
+  /** Compatibilité de type uniquement : ne pas renseigner dans les réponses publiques. */
+  platformUrl?: string;
   hasPrivateDocument?: boolean;
 };
 
