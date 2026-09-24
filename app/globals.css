@@ -14,3 +14,148 @@ footer{padding:22px 0;background:linear-gradient(110deg,var(--deep),#342b50);col
 [data-theme="dark"] .hero{background:radial-gradient(circle at 80% 45%,rgba(215,166,83,.16),transparent 23%),linear-gradient(110deg,#0d2940,#16364f 58%,#3a2648)}[data-theme="dark"] .heroCopy h1,[data-theme="dark"] .heroCopy>p{color:var(--ink)}[data-theme="dark"] .questionForm{border-color:rgba(255,255,255,.2)}
 @keyframes rotate{to{transform:rotate(360deg)}}@media(max-width:1000px){.siteHeader nav{display:none}.workspaceCards{grid-template-columns:1fr}.pickerGrid{grid-template-columns:1fr}.resourceRow{grid-template-columns:90px 1fr}.resourceRow strong{grid-column:2}.rowActions{grid-column:1/-1;justify-content:flex-start}.compactSources li{grid-template-columns:160px 1fr}.sourceActions{grid-column:2}.heroInner{grid-template-columns:1fr;text-align:center}.heroCopy>p{margin-inline:auto}.heroPia{min-height:315px}.heroLogoDisc{width:205px}.heroOrbit{width:265px}.heroOrbitTwo{width:235px}}@media(max-width:650px){.shell{width:min(100% - 24px,620px)}.siteHeader{height:70px}.brand img{width:42px;height:42px}.brand strong{font-size:17px}.brand small{display:none}.languageToggle{display:none}.heroInner{padding-block:50px 75px}.heroCopy h1{font-size:39px}.heroCopy>p{font-size:17px}.workspaceChooser,.toolPanel{padding:20px}.questionForm{height:auto;min-height:62px;flex-wrap:wrap}.questionForm input{font-size:16px}.questionForm>button{width:100%}.resourceRow{display:flex;align-items:flex-start;flex-direction:column}.rowActions{justify-content:flex-start;flex-wrap:wrap}.compactSources li{display:flex;align-items:flex-start;flex-direction:column}.resultSheet{padding:22px 18px}.aboutPanel{align-items:flex-start;flex-direction:column}.aboutPanel>img{width:150px;height:150px}footer p{display:none}.piaTrigger small{display:none}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}@page{size:A4;margin:12mm}@media print{.siteHeader,.hero,.workspaceChooser,.questionForm,.pulseChips,.pickerGrid,.resourceList,.piaDock,footer,.resultSheet>header button{display:none!important}body{background:#fff;color:#17324f}.workspace{padding:0}.toolPanel{padding:0;border:0;box-shadow:none}.resultSheet{margin:0;padding:0;border:0;box-shadow:none}.richText p{font-size:10.5pt}.compactSources li{break-inside:avoid}}
+
+
+/* ============================================================
+   UX V005 — catalogue compact, ordonné et lisible
+   ============================================================ */
+.workspaceChooser{padding:22px 24px;border-radius:20px}
+.workspaceChooser header p{margin-bottom:14px}
+.workspaceCards{gap:10px}
+.workspaceCards>button{min-height:86px;padding:13px 15px;border-radius:14px}
+.workspaceCards>button>span{width:40px;height:40px;border-radius:11px;font-size:18px}
+.workspaceCards strong{font-size:16px}
+.workspaceCards small{font-size:13px;line-height:1.35}
+
+.workspace{padding-top:22px}
+.toolPanel{min-height:0;padding:24px}
+.panelIntro{margin-bottom:16px}
+.panelIntro h2{margin-top:3px}
+.panelIntro p{margin-bottom:8px}
+
+.pickerGrid{
+  display:grid;
+  grid-template-columns:minmax(170px,.68fr) minmax(260px,1.16fr) minmax(260px,1.16fr);
+  align-items:start;
+  gap:11px;
+  margin-bottom:18px
+}
+.pickerField{position:relative;min-width:0}
+.pickerField.disabled{opacity:.5}
+.pickerLabel{display:block;margin-bottom:6px;color:var(--muted);font-size:13px;font-weight:700}
+.pickerButton{
+  width:100%;
+  min-height:54px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  padding:8px 11px 8px 13px;
+  border:1px solid var(--line);
+  border-radius:11px;
+  background:var(--soft);
+  text-align:left
+}
+.pickerButton:hover:not(:disabled){border-color:var(--gold)}
+.pickerButtonText{
+  min-width:0;
+  overflow:hidden;
+  display:-webkit-box;
+  -webkit-box-orient:vertical;
+  -webkit-line-clamp:2;
+  white-space:normal;
+  color:var(--ink);
+  font-size:14px;
+  font-weight:600;
+  line-height:1.25
+}
+.pickerButtonText.placeholder{color:var(--muted);font-weight:500}
+.pickerChevron{flex:0 0 auto;color:var(--muted);font-size:17px}
+.pickerMenu{
+  position:absolute;
+  z-index:60;
+  top:calc(100% + 6px);
+  left:0;
+  right:0;
+  max-height:330px;
+  overflow:auto;
+  padding:6px;
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:var(--surface);
+  box-shadow:0 14px 34px rgba(13,38,65,.18)
+}
+.pickerMenu button{
+  width:100%;
+  display:block;
+  padding:9px 10px;
+  border:0;
+  border-radius:8px;
+  background:transparent;
+  text-align:left
+}
+.pickerMenu button:hover,.pickerMenu button.active{background:var(--soft)}
+.pickerMenu button span{
+  display:-webkit-box;
+  -webkit-box-orient:vertical;
+  -webkit-line-clamp:2;
+  overflow:hidden;
+  white-space:normal;
+  font-size:13px;
+  line-height:1.3
+}
+
+.resourceList{
+  max-height:520px;
+  overflow:auto;
+  border:1px solid var(--line);
+  border-radius:13px;
+  background:var(--surface)
+}
+.resourceRow{
+  grid-template-columns:88px 145px minmax(0,1fr) auto;
+  min-height:70px;
+  gap:10px;
+  padding:10px 12px
+}
+.resourceRow:last-child{border-bottom:0}
+.resourceType{font-size:11px;line-height:1.25}
+.resourceRow code{font-size:12px}
+.resourceRow strong{
+  min-width:0;
+  max-width:760px;
+  display:-webkit-box;
+  -webkit-box-orient:vertical;
+  -webkit-line-clamp:2;
+  overflow:hidden;
+  white-space:normal;
+  font-size:14px;
+  line-height:1.35
+}
+.rowActions{gap:6px}
+.rowActions .ghost{width:34px;height:34px}
+.rowActions>a,.rowActions>button:not(.ghost),.rowActions .primary{
+  min-height:36px;
+  padding:7px 11px;
+  border-radius:8px;
+  font-size:13px;
+  white-space:nowrap
+}
+.rowActions small{max-width:120px;line-height:1.25}
+
+[data-theme="dark"] .pickerButton,[data-theme="dark"] .pickerMenu{background:var(--surface)}
+
+@media(max-width:1100px){
+  .pickerGrid{grid-template-columns:1fr 1fr}
+  .pickerField:last-child{grid-column:1/-1}
+  .resourceRow{grid-template-columns:80px 130px minmax(0,1fr)}
+  .rowActions{grid-column:2/-1;justify-content:flex-start}
+}
+@media(max-width:700px){
+  .pickerGrid{grid-template-columns:1fr}
+  .pickerField:last-child{grid-column:auto}
+  .resourceList{max-height:none;overflow:visible}
+  .resourceRow{display:flex;flex-direction:column;align-items:stretch}
+  .resourceRow strong{max-width:none}
+  .rowActions{justify-content:flex-start;flex-wrap:wrap}
+}
