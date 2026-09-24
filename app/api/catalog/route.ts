@@ -59,7 +59,7 @@ function publicResource(payload: QdrantPayload): CatalogResource | null {
     resourceType: resourceType || "Ressource",
     title,
     pulse: text(payload.pulse),
-    hasPrivateDocument: Boolean(links.drive),
+    hasPrivateDocument: Boolean(text(payload.private_document_url) || links.drive),
     hasSourceText: payload.has_source_text === true,
   };
 }
@@ -81,7 +81,7 @@ export async function GET() {
           limit: 256,
           with_payload: [
             "resource_code", "project", "formation", "block_code", "block_title", "module_code", "module_title",
-            "resource_type", "title", "pulse", "reserved", "has_source_text"
+            "resource_type", "title", "pulse", "reserved", "has_source_text", "private_document_url"
           ],
           with_vector: false,
           ...(offset !== undefined && offset !== null ? { offset } : {}),
