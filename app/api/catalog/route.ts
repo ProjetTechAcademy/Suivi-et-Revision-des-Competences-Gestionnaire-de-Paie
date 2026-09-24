@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import snapshotJson from "@/data/catalogue-snapshot.json";
 import { getResourceLinks } from "@/lib/resource-links";
+import snapshotJson from "@/data/catalogue-snapshot.json";
 
 type QdrantPayload = Record<string, string | number | boolean>;
 type QdrantPoint = { payload?: QdrantPayload };
@@ -26,6 +27,21 @@ type SnapshotResource = {
   reserved: boolean;
 };
 
+type SnapshotResource = {
+  resourceCode: string;
+  project: string;
+  formation: string;
+  blockCode: string;
+  blockTitle: string;
+  moduleCode: string;
+  moduleTitle: string;
+  resourceType: string;
+  title: string;
+  pulse: string;
+  privateDocumentUrl: string;
+  reserved: boolean;
+};
+
 type CatalogResource = {
   resourceCode: string;
   formation: string;
@@ -40,6 +56,7 @@ type CatalogResource = {
   hasSourceText: boolean;
 };
 
+const snapshot = snapshotJson as SnapshotResource[];
 const snapshot = snapshotJson as SnapshotResource[];
 const text = (value: unknown) => typeof value === "string" ? value.trim() : "";
 const publicText = (value: unknown) => text(value)
