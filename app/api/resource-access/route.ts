@@ -17,16 +17,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       error: "Pour des raisons de droit d’auteur, le document source n’est pas accessible depuis cet espace.",
       code: "SOURCE_RESTRICTED",
-      platformUrl: links.platform || "",
     }, { status: 403 });
   }
 
   if (!links.drive) {
     return NextResponse.json({
       error: "Aucun original Drive n’est associé à cette ressource.",
-      platformUrl: links.platform || "",
     }, { status: 404 });
   }
 
-  return NextResponse.json({ documentUrl: links.drive, platformUrl: links.platform || "" });
+  return NextResponse.json({ documentUrl: links.drive });
 }
