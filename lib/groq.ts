@@ -1,7 +1,7 @@
 const GROQ_BASE_URL = "https://api.groq.com/openai/v1";
 type Locale = "fr" | "en";
 
-async function chat(system: string, user: string) {
+async function chat(system: string, user: string, maxCompletionTokens = 1800) {
   const apiKey = process.env.GROQ_API_KEY || "";
   if (!apiKey) throw new Error("GROQ_NOT_CONFIGURED");
   const response = await fetch(`${GROQ_BASE_URL}/chat/completions`, {
@@ -10,6 +10,7 @@ async function chat(system: string, user: string) {
     body: JSON.stringify({
       model: process.env.GROQ_MODEL || "openai/gpt-oss-120b",
       temperature: 0.15,
+      max_completion_tokens: maxCompletionTokens,
       messages: [{ role: "system", content: system }, { role: "user", content: user }],
     }),
   });
@@ -22,7 +23,12 @@ async function chat(system: string, user: string) {
 }
 
 export async function answerWithGroq(question: string, contexts: string[], locale: Locale = "fr") {
-  const context = contexts.slice(0, 10).map((item, index) => `### Extrait ${index + 1}\n${item.slice(0, 5500)}`).join("\n\n");
+  // Le modèle Groq utilisé sur le palier courant impose une enveloppe TPM limitée.
+  // On privilégie plusieurs extraits courts plutôt qu'un énorme prompt qui serait rejeté en 413.
+  const context = contexts
+    .slice(0, 6)
+    .map((item, index) => `### Extrait ${index + 1}\n${item.slice(0, 2400)}`)
+    .join("\n\n");
   const french = locale === "fr";
   const system = french
     ? [
@@ -44,10 +50,14 @@ export async function answerWithGroq(question: string, contexts: string[], local
         "Never claim current external verification unless dated external sources were actually supplied.",
         "Never reveal private URLs, IDs, local paths, API keys or technical secrets.",
       ].join(" ");
-  return chat(system, `Question : ${question}\n\nExtraits du corpus :\n${context || "Aucun extrait pertinent."}`);
+  return chat(
+    system,
+    `Question : ${question}\n\nExtraits du corpus :\n${context || "Aucun extrait pertinent."}`,
+    1600
+  );
 }
 
-function buildRevisionContext(contexts: string[], maxChars = 180000) {
+function buildRevisionContext(contexts: string[], maxChars = 12000) {
   const parts: string[] = [];
   let used = 0;
 
@@ -125,7 +135,8 @@ export async function revisionWithGroq(resourceCode: string, title: string, cont
       "",
       "Document à traiter :",
       context || "Aucun contenu source exploitable."
-    ].join("\n")
+    ].join("\n"),
+    2800
   );
 }
 
