@@ -73,9 +73,14 @@ function Hero({ locale }: { locale: Locale }) {
           <p>{t.heroText}</p>
           <div className="valueList"><span>{t.valueSearch}</span><span>{t.valueContext}</span><span>{t.valuePrivate}</span></div>
         </div>
-        <div className="heroPia" aria-hidden="true">
+        <div className="heroPia" aria-label="Logo officiel PAÏA">
           <span className="heroHalo" />
-          <Image src={piaImages.default} width={640} height={640} alt="" priority />
+          <span className="heroOrbit heroOrbitOne" />
+          <span className="heroOrbit heroOrbitTwo" />
+          <div className="heroLogoDisc">
+            <Image src="/brand/01_PAIA_Circulaire_Logo_Principal.png" width={1080} height={1080} alt="Logo officiel PAÏA" priority />
+          </div>
+          <small>SAVOIR · PRATIQUER · ÉVOLUER</small>
         </div>
       </div>
     </section>
