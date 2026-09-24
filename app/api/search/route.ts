@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { publicText, type ResourceRecommendation } from "@/lib/corpus";
+import type { ResourceRecommendation } from "@/lib/corpus";
 import { answerWithGroq } from "@/lib/groq";
 import { searchQdrant } from "@/lib/qdrant";
+import { getResourceLinks } from "@/lib/resource-links";
 
 type Locale = "fr" | "en";
 type SearchBody = { query: string; pulse?: string; resourceCode?: string; locale: Locale };
@@ -32,17 +33,19 @@ function recommendations(hits: Awaited<ReturnType<typeof searchQdrant>>, locale:
     const resourceCode = String(payload.resource_code ?? "");
     if (!resourceCode || seen.has(resourceCode)) return [];
     seen.add(resourceCode);
+    const links = getResourceLinks(resourceCode);
     return [{
       resourceCode,
-      formation: publicText(payload.formation),
+      formation: String(payload.formation ?? ""),
       blockCode: String(payload.block_code ?? ""),
-      blockTitle: publicText(payload.block_title),
+      blockTitle: String(payload.block_title ?? ""),
       moduleCode: String(payload.module_code ?? ""),
-      moduleTitle: publicText(payload.module_title),
-      resourceType: publicText(payload.resource_type),
-      title: publicText(payload.title),
+      moduleTitle: String(payload.module_title ?? ""),
+      resourceType: String(payload.resource_type ?? ""),
+      title: String(payload.title ?? ""),
       reason: locale === "en" ? "Related resource found in the corpus." : "Ressource associée trouvée dans le corpus.",
-      hasPrivateDocument: Boolean(String(payload.private_document_url ?? "").trim()),
+      ...(links.platform ? { platformUrl: links.platform } : {}),
+      hasPrivateDocument: Boolean(links.drive),
     }];
   }).slice(0, 8);
 }
@@ -69,8 +72,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         title: body.query,
         summary: body.locale === "en"
-          ? "🎯 Related resources were found, but their full text is not yet indexed for free-form search. I will not invent an answer from metadata alone.\n\n🔎 Current verification\nOpen a private source or create a PIA Sheet from a specific resource while the full search index is being enriched."
-          : "🎯 Des ressources proches ont été trouvées, mais leur texte intégral n’est pas encore indexé pour la recherche libre. Je ne vais pas inventer une réponse à partir de simples métadonnées.\n\n🔎 Vérification actuelle\nVous pouvez déjà ouvrir une source privée ou créer une Fiche PIA à partir d’une ressource précise pendant l’enrichissement de l’index de recherche.",
+          ? "🎯 Related resources were found, but their full text is not yet indexed for free-form search. I will not invent an answer from metadata alone.\n\n🔎 Current verification\nOpen a source or create a PIA Sheet from a specific resource while the full search index is being enriched."
+          : "🎯 Des ressources proches ont été trouvées, mais leur texte intégral n’est pas encore indexé pour la recherche libre. Je ne vais pas inventer une réponse à partir de simples métadonnées.\n\n🔎 Vérification actuelle\nVous pouvez déjà ouvrir une source ou créer une Fiche PIA à partir d’une ressource précise pendant l’enrichissement de l’index de recherche.",
         resources,
         sourceTextAvailable: false,
       });
