@@ -76,9 +76,9 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("PIA sheet generation error", error);
+    console.error("PAÏA sheet generation error", error);
     return NextResponse.json({
-      error: locale === "en" ? "PIA Sheet generation failed." : "La génération de la Fiche PIA a échoué.",
+      error: locale === "en" ? "PAÏA Sheet generation failed." : "La génération de la Fiche PAÏA a échoué.",
     }, { status: 502 });
   }
 }
