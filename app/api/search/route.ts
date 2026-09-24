@@ -69,7 +69,7 @@ function recommendations(hits: Awaited<ReturnType<typeof searchQdrant>>, locale:
       resourceType: publicText(payload.resource_type),
       title: publicText(payload.title),
       reason: locale === "en" ? "Related resource found in the corpus." : "Ressource associée trouvée dans le corpus.",
-      hasPrivateDocument: Boolean(links.drive),
+      hasPrivateDocument: Boolean(text(payload.private_document_url) || links.drive),
     }];
   }).slice(0, 8);
 }
@@ -96,8 +96,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         title: body.query,
         summary: body.locale === "en"
-          ? "🎯 Related resources were found, but their full text is not yet indexed for free-form search. I will not invent an answer from metadata alone.\n\n🔎 Current verification\nOpen a private source or create a PIA Sheet from a specific resource while the full search index is being enriched."
-          : "🎯 Des ressources proches ont été trouvées, mais leur texte intégral n’est pas encore indexé pour la recherche libre. Je ne vais pas inventer une réponse à partir de simples métadonnées.\n\n🔎 Vérification actuelle\nVous pouvez déjà ouvrir une source privée ou créer une Fiche PIA à partir d’une ressource précise pendant l’enrichissement de l’index de recherche.",
+          ? "🎯 Related resources were found, but their full text is not yet indexed for free-form search. I will not invent an answer from metadata alone.\n\n🔎 Current verification\nOpen a private source or create a PAÏA Sheet from a specific resource while the full search index is being enriched."
+          : "🎯 Des ressources proches ont été trouvées, mais leur texte intégral n’est pas encore indexé pour la recherche libre. Je ne vais pas inventer une réponse à partir de simples métadonnées.\n\n🔎 Vérification actuelle\nVous pouvez déjà ouvrir une source privée ou créer une Fiche PAÏA à partir d’une ressource précise pendant l’enrichissement de l’index de recherche.",
         resources,
         sourceTextAvailable: false,
       });
