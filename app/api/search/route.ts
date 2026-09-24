@@ -7,6 +7,30 @@ import { getResourceLinks } from "@/lib/resource-links";
 type Locale = "fr" | "en";
 type SearchBody = { query: string; pulse?: string; resourceCode?: string; locale: Locale };
 
+const text = (value: unknown) => typeof value === "string" ? value.trim() : "";
+const publicText = (value: unknown) => text(value)
+  .replace(/\b(?:studi|mba|bachelor|graduate)\b/gi, "")
+  .replace(/\s{2,}/g, " ")
+  .replace(/\s+([:;,])/g, "$1")
+  .trim();
+
+function corpusName(project: unknown, fallback: unknown) {
+  const names: Record<string, string> = {
+    "14": "Digital",
+    "15": "Formateur",
+    "16": "Python",
+    "17": "RH",
+    "18": "Paie",
+    "19": "Divers",
+  };
+  return names[text(project)] || publicText(fallback);
+}
+
+function neutralBlock(code: string, title: unknown) {
+  if (/^B0{1,2}$/i.test(code)) return "Introduction";
+  return publicText(title);
+}
+
 async function readBody(request: NextRequest): Promise<SearchBody | null> {
   try {
     const value = await request.json() as unknown;
@@ -34,17 +58,17 @@ function recommendations(hits: Awaited<ReturnType<typeof searchQdrant>>, locale:
     if (!resourceCode || seen.has(resourceCode)) return [];
     seen.add(resourceCode);
     const links = getResourceLinks(resourceCode);
+    const blockCode = String(payload.block_code ?? "");
     return [{
       resourceCode,
-      formation: String(payload.formation ?? ""),
-      blockCode: String(payload.block_code ?? ""),
-      blockTitle: String(payload.block_title ?? ""),
+      formation: corpusName(payload.project, payload.formation),
+      blockCode,
+      blockTitle: neutralBlock(blockCode, payload.block_title),
       moduleCode: String(payload.module_code ?? ""),
-      moduleTitle: String(payload.module_title ?? ""),
-      resourceType: String(payload.resource_type ?? ""),
-      title: String(payload.title ?? ""),
+      moduleTitle: publicText(payload.module_title),
+      resourceType: publicText(payload.resource_type),
+      title: publicText(payload.title),
       reason: locale === "en" ? "Related resource found in the corpus." : "Ressource associée trouvée dans le corpus.",
-      ...(links.platform ? { platformUrl: links.platform } : {}),
       hasPrivateDocument: Boolean(links.drive),
     }];
   }).slice(0, 8);
@@ -72,8 +96,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         title: body.query,
         summary: body.locale === "en"
-          ? "🎯 Related resources were found, but their full text is not yet indexed for free-form search. I will not invent an answer from metadata alone.\n\n🔎 Current verification\nOpen a source or create a PIA Sheet from a specific resource while the full search index is being enriched."
-          : "🎯 Des ressources proches ont été trouvées, mais leur texte intégral n’est pas encore indexé pour la recherche libre. Je ne vais pas inventer une réponse à partir de simples métadonnées.\n\n🔎 Vérification actuelle\nVous pouvez déjà ouvrir une source ou créer une Fiche PIA à partir d’une ressource précise pendant l’enrichissement de l’index de recherche.",
+          ? "🎯 Related resources were found, but their full text is not yet indexed for free-form search. I will not invent an answer from metadata alone.\n\n🔎 Current verification\nOpen a private source or create a PIA Sheet from a specific resource while the full search index is being enriched."
+          : "🎯 Des ressources proches ont été trouvées, mais leur texte intégral n’est pas encore indexé pour la recherche libre. Je ne vais pas inventer une réponse à partir de simples métadonnées.\n\n🔎 Vérification actuelle\nVous pouvez déjà ouvrir une source privée ou créer une Fiche PIA à partir d’une ressource précise pendant l’enrichissement de l’index de recherche.",
         resources,
         sourceTextAvailable: false,
       });
