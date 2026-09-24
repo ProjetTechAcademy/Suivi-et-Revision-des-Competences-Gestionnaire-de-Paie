@@ -1,11 +1,9 @@
 export async function extractTextFromFile(file: File) {
   if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
-    const [{ PDFParse }, { CanvasFactory }] = await Promise.all([
-      import("pdf-parse"),
-      import("pdf-parse/worker"),
-    ]);
+    const { CanvasFactory } = await import("pdf-parse/worker");
+    const { PDFParse } = await import("pdf-parse");
 
-    const data = new Uint8Array(await file.arrayBuffer());
+    const data = Buffer.from(await file.arrayBuffer());
     const parser = new PDFParse({ data, CanvasFactory });
 
     try {
