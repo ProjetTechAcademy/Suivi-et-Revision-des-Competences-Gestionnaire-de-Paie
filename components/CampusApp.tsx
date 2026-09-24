@@ -1,172 +1,141 @@
 "use client";
 
 import Image from "next/image";
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import type { ResourceRecommendation } from "@/lib/corpus";
 import { copy, type Locale } from "@/lib/i18n";
-import { piaImages, piaInterfaceState, type PiaVisualState } from "@/lib/pia";
+import { piaImages } from "@/lib/pia";
 import { ThemeToggle } from "./ThemeToggle";
 
-type Answer = { title: string; summary: string; resources?: ResourceRecommendation[] };
-type CatalogResource = Omit<ResourceRecommendation, "reason"> & { pulse: string };
-type Favorite = { kind: "resource" | "answer"; code: string; title: string };
-type SearchState = "idle" | "listening" | "searching" | "success" | "error";
+type Mode = "question" | "documents" | "revision" | "favorites" | "about";
+type Answer = { title: string; summary: string; resources?: ResourceRecommendation[]; sourceTextAvailable?: boolean };
+type Revision = { title: string; resourceCode: string; content: string };
+type CatalogResource = Omit<ResourceRecommendation, "reason"> & {
+  pulse: string;
+  platformUrl?: string;
+  hasPrivateDocument: boolean;
+  hasSourceText: boolean;
+};
+type Favorite = { code: string; title: string; kind: "resource" | "answer" | "revision" };
 
-const pulses = [
-  ["Paie & Social", "Paie, déclaratif et protection sociale", "▦"],
-  ["RH", "Talents, recrutement et parcours", "◇"],
-  ["SIRH", "Outils, flux et interopérabilité", "⌘"],
-  ["Droit social", "Relations de travail et réglementation", "§"],
-  ["AMOA & Projet", "Cadrage, conduite et recette", "◎"],
-  ["Management", "Organisation et pratiques collectives", "△"],
-  ["Digital & IA", "IA, automatisation et usages", "✦"],
-  ["Tech", "Développement, données et tests", "</>"],
-] as const;
+const pulseNames = ["Paie & Social", "RH", "SIRH", "Droit social", "AMOA & Projet", "Management", "Digital & IA", "Tech"];
 
 function Brand({ locale }: { locale: Locale }) {
-  return (
-    <span className="brand">
-      <Image src="/brand/02_PAIA_Circulaire_Logo_Compact.png" width={56} height={56} alt="Logo PAÏA" priority />
-      <span><strong>Corpus Campus PAÏA</strong><small>{copy[locale].brandTagline}</small></span>
-    </span>
-  );
+  return <span className="brand"><Image src="/brand/02_PAIA_Circulaire_Logo_Compact.png" width={54} height={54} alt="Logo PAÏA" /><span><strong>Corpus Campus PAÏA</strong><small>{copy[locale].brandTagline}</small></span></span>;
 }
 
-function LanguageToggle({ locale, setLocale }: { locale: Locale; setLocale: (locale: Locale) => void }) {
-  return (
-    <div className="languageToggle" role="group" aria-label={copy[locale].languageLabel}>
-      <button className={locale === "fr" ? "active" : ""} onClick={() => setLocale("fr")} aria-pressed={locale === "fr"}>FR</button>
-      <button className={locale === "en" ? "active" : ""} onClick={() => setLocale("en")} aria-pressed={locale === "en"}>EN</button>
-    </div>
-  );
-}
-
-function Header({ locale, setLocale }: { locale: Locale; setLocale: (locale: Locale) => void }) {
-  const [open, setOpen] = useState(false);
+function Header({ locale, setLocale, setMode }: { locale: Locale; setLocale: (locale: Locale) => void; setMode: (mode: Mode) => void }) {
   const t = copy[locale];
-  return (
-    <header className="siteHeader">
-      <div className="headerInner shell">
-        <a href="#accueil" aria-label="Corpus Campus PAÏA"><Brand locale={locale} /></a>
-        <button className="menuButton" onClick={() => setOpen(!open)} aria-expanded={open} aria-label={open ? t.closeMenu : t.openMenu}>☰</button>
-        <nav className={`mainNav ${open ? "open" : ""}`} aria-label={t.navigation}>
-          <a href="#accueil">{t.home}</a>
-          <a href="#explorer">{t.explorer}</a>
-          <a href="#recherche">{t.search}</a>
-          <a href="#favoris">{t.favorites}</a>
-          <a href="#apropos">{t.about}</a>
-        </nav>
-        <div className="headerTools"><LanguageToggle locale={locale} setLocale={setLocale} /><ThemeToggle /></div>
-      </div>
-    </header>
-  );
+  return <header className="siteHeader"><div className="headerInner shell">
+    <button className="brandButton" onClick={() => { setMode("question"); window.scrollTo({ top: 0, behavior: "smooth" }); }}><Brand locale={locale} /></button>
+    <nav>
+      <button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}>{t.home}</button>
+      <button onClick={() => setMode("question")}>{t.tools}</button>
+      <button onClick={() => setMode("favorites")}>{t.favorites}</button>
+      <button onClick={() => setMode("about")}>{t.about}</button>
+    </nav>
+    <div className="headerTools">
+      <div className="languageToggle"><button className={locale === "fr" ? "active" : ""} onClick={() => setLocale("fr")}>FR</button><button className={locale === "en" ? "active" : ""} onClick={() => setLocale("en")}>EN</button></div>
+      <ThemeToggle />
+    </div>
+  </div></header>;
 }
 
 function Hero({ locale }: { locale: Locale }) {
   const t = copy[locale];
-  return (
-    <section className="hero" id="accueil">
-      <div className="heroInner shell">
-        <div className="heroCopy">
-          <span className="overline">{t.heroOverline}</span>
-          <h1>{t.heroTitleA}<br /><em>{t.heroTitleB}</em></h1>
-          <p>{t.heroText}</p>
-          <div className="valueList"><span>{t.valueSearch}</span><span>{t.valueContext}</span><span>{t.valuePrivate}</span></div>
-        </div>
-        <div className="heroPia" aria-label="Logo officiel PAÏA">
-          <span className="heroHalo" />
-          <span className="heroOrbit heroOrbitOne" />
-          <span className="heroOrbit heroOrbitTwo" />
-          <div className="heroLogoDisc">
-            <Image src="/brand/01_PAIA_Circulaire_Logo_Principal.png" width={1080} height={1080} alt="Logo officiel PAÏA" priority />
-          </div>
-          <small>SAVOIR · PRATIQUER · ÉVOLUER</small>
-        </div>
-      </div>
-    </section>
-  );
+  return <section className="hero"><div className="heroInner shell">
+    <div className="heroCopy"><span className="overline">{t.heroOverline}</span><h1>{t.heroTitleA}<br /><em>{t.heroTitleB}</em></h1><p>{t.heroText}</p></div>
+    <div className="heroPia" aria-label="Logo officiel PAÏA"><span className="heroHalo" /><span className="heroOrbit heroOrbitOne" /><span className="heroOrbit heroOrbitTwo" /><div className="heroLogoDisc"><Image src="/brand/01_PAIA_Circulaire_Logo_Principal.png" width={1080} height={1080} alt="Logo officiel PAÏA" priority /></div><small>SAVOIR · PRATIQUER · ÉVOLUER</small></div>
+  </div></section>;
 }
 
-function Search({ locale, pulse, onAnswer, onState, inputRef }: { locale: Locale; pulse: string; onAnswer: (answer: Answer) => void; onState: (state: SearchState) => void; inputRef: React.RefObject<HTMLInputElement | null> }) {
+function WorkspaceChooser({ locale, mode, setMode }: { locale: Locale; mode: Mode; setMode: (mode: Mode) => void }) {
+  const t = copy[locale];
+  const options: Array<[Mode, string, string, string]> = [
+    ["question", "?", t.ask, t.askText],
+    ["documents", "↗", t.read, t.readText],
+    ["revision", "✦", t.revise, t.reviseText],
+  ];
+  return <section className="workspaceChooser shell"><header><span className="eyebrow">CORPUS CAMPUS PAÏA</span><h2>{t.chooseAction}</h2><p>{t.chooseActionText}</p></header><div className="workspaceCards">{options.map(([value, icon, title, text]) => <button key={value} className={mode === value ? "active" : ""} onClick={() => setMode(value)}><span>{icon}</span><div><strong>{title}</strong><small>{text}</small></div></button>)}</div></section>;
+}
+
+function inline(text: string) {
+  return text.split(/(\*\*[^*]+\*\*)/g).map((part, index) => part.startsWith("**") && part.endsWith("**") ? <strong key={index}>{part.slice(2, -2)}</strong> : <span key={index}>{part}</span>);
+}
+
+function RichText({ text }: { text: string }) {
+  return <div className="richText">{text.split(/\n/).map((raw, index) => {
+    const line = raw.trim();
+    if (!line) return <div className="richSpace" key={index} />;
+    if (line.startsWith("### ")) return <h4 key={index}>{inline(line.slice(4))}</h4>;
+    if (line.startsWith("## ")) return <h3 key={index}>{inline(line.slice(3))}</h3>;
+    if (line.startsWith("# ")) return <h2 key={index}>{inline(line.slice(2))}</h2>;
+    if (/^[-•]\s+/.test(line)) return <p className="richBullet" key={index}>{inline(line.replace(/^[-•]\s+/, ""))}</p>;
+    if (/^\d+[.)]\s+/.test(line)) return <p className="richNumber" key={index}>{inline(line)}</p>;
+    return <p key={index}>{inline(line)}</p>;
+  })}</div>;
+}
+
+function CompactSources({ locale, resources, openDocument }: { locale: Locale; resources: ResourceRecommendation[]; openDocument: (resource: ResourceRecommendation) => void }) {
+  const t = copy[locale];
+  if (!resources.length) return null;
+  return <section className="compactSources"><h3>📚 {t.resourcesUsed}</h3><ul>{resources.map((resource) => <li key={resource.resourceCode}><code>{resource.resourceCode}</code><span>{resource.title}</span><span className="sourceActions">{resource.hasPrivateDocument && <button onClick={() => openDocument(resource)}>{t.openDocument}</button>}{resource.platformUrl && <a href={resource.platformUrl} target="_blank" rel="noreferrer">{t.platform}</a>}</span></li>)}</ul></section>;
+}
+
+function QuestionPanel({ locale, ownerKey, setOwnerKey, saveFavorite }: { locale: Locale; ownerKey: string; setOwnerKey: (key: string) => void; saveFavorite: (favorite: Favorite) => void }) {
   const t = copy[locale];
   const [query, setQuery] = useState("");
+  const [pulse, setPulse] = useState("");
+  const [answer, setAnswer] = useState<Answer | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  const openDocument = async (resource: ResourceRecommendation) => {
+    let key = ownerKey;
+    if (!key) {
+      key = window.prompt(t.ownerPrompt) || "";
+      if (key) setOwnerKey(key);
+    }
+    const response = await fetch("/api/resource-access", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ resourceCode: resource.resourceCode, ownerKey: key }) });
+    const data = await response.json();
+    if (response.ok && data.documentUrl) window.open(data.documentUrl, "_blank", "noopener,noreferrer");
+    else setError(data.error || t.sourceRestricted);
+  };
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (!query.trim()) return;
-    setLoading(true);
-    setError("");
-    onState("searching");
-
+    setLoading(true); setError("");
     try {
-      const response = await fetch("/api/search", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query, pulse, locale }),
-      });
+      const response = await fetch("/api/search", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query, pulse, locale }) });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || t.searchUnavailable);
-      onAnswer(data);
-      onState("success");
-      window.setTimeout(() => document.querySelector("#fiche")?.scrollIntoView({ behavior: "smooth" }), 80);
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : t.searchUnavailable);
-      onState("error");
-    } finally {
-      setLoading(false);
-    }
+      if (!response.ok) throw new Error(data.error || "Erreur");
+      setAnswer(data);
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Erreur"); }
+    finally { setLoading(false); }
   };
 
-  const examples = locale === "fr"
-    ? ["Expliquer une notion de droit social", "Comparer deux méthodes de gestion de projet", "Comprendre les tests d’une API"]
-    : ["Explain an employment-law concept", "Compare two project methods", "Understand API testing"];
-
-  return (
-    <section className="searchArea shell" id="recherche" aria-labelledby="search-title">
-      <div className="searchHeading"><span className="eyebrow">{t.searchOverline}</span><h2 id="search-title">{t.searchTitle}</h2><p>{t.searchText}</p></div>
-      <form className="searchForm" onSubmit={submit}>
-        <span aria-hidden="true">⌕</span>
-        <input ref={inputRef} value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t.searchPlaceholder} aria-label={t.searchInputLabel} />
-        <button disabled={loading} aria-label={t.searchButton}>{loading ? "…" : "→"}</button>
-      </form>
-      <div className="suggestions"><span>{t.suggestions}</span>{examples.map((item) => <button key={item} type="button" onClick={() => { setQuery(item); inputRef.current?.focus(); }}>{item}</button>)}</div>
-      {pulse && <div className="activeFilter">Pulse : <b>{pulse}</b></div>}
-      {loading && <div className="searchLoading" role="status"><i /><div><b>{t.searchingTitle}</b><span>{t.searchingText}</span></div></div>}
-      {error && <p className="searchError" role="alert">{error}</p>}
-    </section>
-  );
+  return <section className="toolPanel">
+    <form className="questionForm" onSubmit={submit}><span>⌕</span><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t.searchPlaceholder} /><button disabled={loading}>{loading ? "…" : t.searchButton}</button></form>
+    <div className="pulseChips"><small>{t.pulse}</small>{pulseNames.map((name) => <button key={name} className={pulse === name ? "active" : ""} onClick={() => setPulse(pulse === name ? "" : name)}>{name}</button>)}</div>
+    {error && <p className="notice error">{error}</p>}
+    {answer && <article className="resultSheet"><header><span className="eyebrow">{t.answer}</span><h2>{answer.title}</h2><div><button onClick={() => saveFavorite({ kind: "answer", code: answer.title, title: answer.title })}>♡ {t.favoriteAdd}</button><button onClick={() => window.print()}>▣ {t.print}</button></div></header><RichText text={answer.summary} /><CompactSources locale={locale} resources={answer.resources ?? []} openDocument={openDocument} /></article>}
+  </section>;
 }
 
-function Pulses({ locale, onSelect }: { locale: Locale; onSelect: (name: string) => void }) {
-  const t = copy[locale];
-  return (
-    <section className="pulseSection shell">
-      <div className="sectionTitle"><span className="pulseBolt">ϟ</span><div><h2>{t.pulseTitle}</h2><p>{t.pulseText}</p></div></div>
-      <div className="pulseGrid">{pulses.map(([name, description, icon]) => <button className="pulseCard" key={name} onClick={() => onSelect(name)}><span className="pulseIcon">{icon}</span><b>{name}</b><p>{description}</p><i>{t.choose} →</i></button>)}</div>
-    </section>
-  );
-}
-
-function Explorer({ locale, onOpen, onFavorite }: { locale: Locale; onOpen: (resource: CatalogResource) => void; onFavorite: (favorite: Favorite) => void }) {
+function ResourcePicker({ locale, mode, ownerKey, setOwnerKey, saveFavorite }: { locale: Locale; mode: "documents" | "revision"; ownerKey: string; setOwnerKey: (key: string) => void; saveFavorite: (favorite: Favorite) => void }) {
   const t = copy[locale];
   const [resources, setResources] = useState<CatalogResource[]>([]);
   const [loading, setLoading] = useState(true);
-  const [connected, setConnected] = useState(true);
   const [parcours, setParcours] = useState("");
   const [block, setBlock] = useState("");
   const [module, setModule] = useState("");
+  const [message, setMessage] = useState("");
+  const [revision, setRevision] = useState<Revision | null>(null);
+  const [generating, setGenerating] = useState("");
 
   useEffect(() => {
-    fetch("/api/catalog")
-      .then(async (response) => {
-        const data = await response.json();
-        setResources(data.resources ?? []);
-        setConnected(Boolean(data.connected));
-      })
-      .catch(() => setConnected(false))
-      .finally(() => setLoading(false));
+    fetch("/api/catalog").then((r) => r.json()).then((data) => setResources(data.resources ?? [])).catch(() => setMessage("Catalogue indisponible.")).finally(() => setLoading(false));
   }, []);
 
   const parcoursList = useMemo(() => [...new Set(resources.map((r) => r.formation).filter(Boolean))].sort(), [resources]);
@@ -176,153 +145,111 @@ function Explorer({ locale, onOpen, onFavorite }: { locale: Locale; onOpen: (res
   const modules = [...new Map(byBlock.map((r) => [r.moduleCode || r.moduleTitle, `${r.moduleCode}${r.moduleCode && r.moduleTitle ? " — " : ""}${r.moduleTitle}`])).entries()];
   const visible = byBlock.filter((r) => (r.moduleCode || r.moduleTitle) === module);
 
-  return (
-    <section className="explorer shell" id="explorer">
-      <header><span className="overline">{t.libraryOverline}</span><h2>{t.explorerTitle}</h2><p>{t.explorerText}</p></header>
-      <div className="steps" aria-label={t.progress}>
-        <span className="ready"><b>1</b>{t.parcours}</span>
-        <span className={parcours ? "ready" : ""}><b>2</b>{t.block}</span>
-        <span className={block ? "ready" : ""}><b>3</b>{t.module}</span>
-        <span className={module ? "ready" : ""}><b>4</b>{t.resource}</span>
+  const openDocument = async (resource: CatalogResource | ResourceRecommendation) => {
+    let key = ownerKey;
+    if (!key) {
+      key = window.prompt(t.ownerPrompt) || "";
+      if (key) setOwnerKey(key);
+    }
+    const response = await fetch("/api/resource-access", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ resourceCode: resource.resourceCode, ownerKey: key }) });
+    const data = await response.json();
+    if (response.ok && data.documentUrl) window.open(data.documentUrl, "_blank", "noopener,noreferrer");
+    else setMessage(data.error || t.sourceRestricted);
+  };
+
+  const generateRevision = async (resource: CatalogResource) => {
+    setGenerating(resource.resourceCode); setMessage(""); setRevision(null);
+    try {
+      const response = await fetch("/api/revision", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ resourceCode: resource.resourceCode, locale }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Erreur");
+      setRevision(data);
+      window.setTimeout(() => document.querySelector("#revision-result")?.scrollIntoView({ behavior: "smooth" }), 80);
+    } catch (reason) { setMessage(reason instanceof Error ? reason.message : "Erreur"); }
+    finally { setGenerating(""); }
+  };
+
+  return <section className="toolPanel">
+    <header className="panelIntro"><span className="eyebrow">{mode === "documents" ? "BIBLIOTHÈQUE" : "RÉVISION"}</span><h2>{t.explorerTitle}</h2><p>{t.explorerText}</p></header>
+    {loading ? <p className="notice">{t.loading}</p> : <>
+      <div className="pickerGrid">
+        <label>{t.parcours}<select value={parcours} onChange={(e) => { setParcours(e.target.value); setBlock(""); setModule(""); }}><option value="">{t.chooseParcours}</option>{parcoursList.map((item) => <option key={item}>{item}</option>)}</select></label>
+        <label className={!parcours ? "disabled" : ""}>{t.block}<select disabled={!parcours} value={block} onChange={(e) => { setBlock(e.target.value); setModule(""); }}><option value="">{t.chooseBlock}</option>{blocks.map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
+        <label className={!block ? "disabled" : ""}>{t.module}<select disabled={!block} value={module} onChange={(e) => setModule(e.target.value)}><option value="">{t.chooseModule}</option>{modules.map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
       </div>
-
-      <div className="explorerCard">
-        {loading ? <div className="catalogState"><i /><h3>{t.catalogLoading}</h3></div> : !connected ? <div className="catalogState"><h3>{t.catalogDisconnected}</h3><p>{t.catalogDisconnectedText}</p></div> : !resources.length ? <div className="catalogState"><h3>{t.catalogEmpty}</h3></div> : <>
-          <label>{t.parcours}<select value={parcours} onChange={(e) => { setParcours(e.target.value); setBlock(""); setModule(""); }}><option value="">{t.chooseParcours}</option>{parcoursList.map((item) => <option key={item}>{item}</option>)}</select></label>
-          {parcours && <label>{t.block}<select value={block} onChange={(e) => { setBlock(e.target.value); setModule(""); }}><option value="">{t.chooseBlock}</option>{blocks.map(([key, label]) => <option value={key} key={key}>{label}</option>)}</select></label>}
-          {block && <label>{t.module}<select value={module} onChange={(e) => setModule(e.target.value)}><option value="">{t.chooseModule}</option>{modules.map(([key, label]) => <option value={key} key={key}>{label}</option>)}</select></label>}
-          {module && <div className="resourceGrid">{visible.map((resource) => <article key={resource.resourceCode}><span>{resource.resourceType}</span><h3>{resource.title}</h3><p>{resource.resourceCode}{resource.pulse ? ` · ${resource.pulse}` : ""}</p><div><button onClick={() => onOpen(resource)}>{t.viewSheet}</button><button aria-label={t.addFavorite} onClick={() => onFavorite({ kind: "resource", code: resource.resourceCode, title: resource.title })}>♡</button></div></article>)}</div>}
-        </>}
-      </div>
-    </section>
-  );
+      {module && <div className="resourceList">{visible.length ? visible.map((resource) => <div className="resourceRow" key={resource.resourceCode}><span className="resourceType">{resource.resourceType}</span><code>{resource.resourceCode}</code><strong>{resource.title}</strong><span className="rowActions">
+        <button className="ghost" onClick={() => saveFavorite({ kind: "resource", code: resource.resourceCode, title: resource.title })}>♡</button>
+        {mode === "documents" && resource.hasPrivateDocument && <button onClick={() => openDocument(resource)}>{t.openDocument}</button>}
+        {mode === "documents" && resource.platformUrl && <a href={resource.platformUrl} target="_blank" rel="noreferrer">{t.platform}</a>}
+        {mode === "documents" && !resource.hasPrivateDocument && !resource.platformUrl && <small>{t.sourceNotLinked}</small>}
+        <button className="primary" onClick={() => generateRevision(resource)} disabled={generating === resource.resourceCode}>{generating === resource.resourceCode ? t.generatingRevision : t.generateRevision}</button>
+      </span></div>) : <p className="notice">{t.noResources}</p>}</div>}
+    </>}
+    {message && <p className="notice error">{message}</p>}
+    {revision && <article className="resultSheet revisionSheet" id="revision-result"><header><span className="eyebrow">FICHE PRATIQUE</span><h2>{revision.title}</h2><div><code>{revision.resourceCode}</code><button onClick={() => saveFavorite({ kind: "revision", code: revision.resourceCode, title: revision.title })}>♡ {t.favoriteAdd}</button><button onClick={() => window.print()}>▣ {t.print}</button></div></header><RichText text={revision.content} /></article>}
+  </section>;
 }
 
-function KnowledgeSheet({ locale, answer, selected, onFavorite }: { locale: Locale; answer: Answer | null; selected: CatalogResource | null; onFavorite: (favorite: Favorite) => void }) {
-  if (!answer && !selected) return null;
-
+function FavoritesPanel({ locale, favorites, remove }: { locale: Locale; favorites: Favorite[]; remove: (code: string) => void }) {
   const t = copy[locale];
-  const title = answer?.title || selected?.title || "";
-  const summary = answer?.summary || t.resourceSelected;
-  const resources = answer?.resources ?? (selected ? [{ ...selected, reason: t.selectedReason }] : []);
-
-  return (
-    <section className="sheetSection" id="fiche">
-      <div className="sheetShell shell">
-        <article className="knowledgeCard">
-          <header className="printHeader">
-            <div><span className="eyebrow">{t.knowledgeSheet}</span><h1>{title}</h1><p>{selected ? `${selected.formation} · ${selected.blockTitle} · ${selected.moduleTitle}` : t.generatedFromCorpus}</p></div>
-            <Image src={selected?.pulse === "Paie & Social" ? piaImages.payroll : piaImages.answer} width={140} height={140} alt="Pia" />
-          </header>
-          <div className="sheetActions"><button onClick={() => onFavorite({ kind: answer ? "answer" : "resource", code: selected?.resourceCode || title, title })}>♡ {t.addFavorite}</button><button onClick={() => window.print()}>▣ {t.print}</button></div>
-          <section className="synthesis"><span>{t.essential}</span><p className="answerText">{summary}</p></section>
-          <section>
-            <div className="sectionIntro"><span>{t.documentsUsed}</span><h2>{t.sourcesTitle}</h2><p>{t.sourcesText}</p></div>
-            <div className="sourceGrid">{resources.map((resource) => <article key={resource.resourceCode}><div className="sourceTop"><span>{resource.resourceType || t.resource}</span><code>{resource.resourceCode}</code></div><h3>{resource.title}</h3><dl><div><dt>{t.parcours}</dt><dd>{resource.formation}</dd></div><div><dt>{t.block}</dt><dd>{resource.blockCode} {resource.blockTitle}</dd></div><div><dt>{t.module}</dt><dd>{resource.moduleCode} {resource.moduleTitle}</dd></div></dl><p>{resource.reason}</p></article>)}</div>
-          </section>
-          <section className="watch"><span>{t.watchStatus}</span><h2>{t.watchTitle}</h2><p>{t.watchText}</p></section>
-        </article>
-      </div>
-    </section>
-  );
+  return <section className="toolPanel"><header className="panelIntro"><span className="eyebrow">FAVORIS</span><h2>{t.favoritesTitle}</h2></header>{favorites.length ? <div className="favoriteList">{favorites.map((item) => <div key={item.code}><span>{item.kind}</span><code>{item.code}</code><strong>{item.title}</strong><button onClick={() => remove(item.code)}>×</button></div>)}</div> : <p className="notice">{t.noFavorites}</p>}</section>;
 }
 
-function Favorites({ locale, favorites, remove }: { locale: Locale; favorites: Favorite[]; remove: (code: string) => void }) {
+function AboutPanel({ locale }: { locale: Locale }) {
   const t = copy[locale];
-  return (
-    <section className="favorites shell" id="favoris">
-      <div className="sectionTitle"><div><h2>{t.favoritesTitle}</h2><p>{t.favoritesText}</p></div></div>
-      {favorites.length ? <div className="favoriteGrid">{favorites.map((favorite) => <article key={`${favorite.kind}-${favorite.code}`}><small>{favorite.kind === "answer" ? t.answer : t.resource}</small><button aria-label={t.removeFavorite} onClick={() => remove(favorite.code)}>×</button><h3>{favorite.title}</h3><code>{favorite.code}</code></article>)}</div> : <div className="emptyState"><span>♡</span><h3>{t.noFavorites}</h3><p>{t.noFavoritesText}</p></div>}
-    </section>
-  );
+  return <section className="toolPanel aboutPanel"><img src={piaImages.default} alt="Pia, mascotte de Corpus Campus PAÏA" /><div><span className="eyebrow">À PROPOS</span><h2>{t.aboutTitle}</h2><p>{t.aboutText}</p></div></section>;
 }
 
-function About({ locale }: { locale: Locale }) {
-  const t = copy[locale];
-  return <section className="about shell" id="apropos"><Image src={piaImages.hr} width={150} height={150} alt="Pia" /><div><span className="eyebrow">{t.aboutOverline}</span><h2>{t.aboutTitle}</h2><p>{t.aboutText}</p></div></section>;
-}
-
-function PiaAssistant({ locale, state, inputRef }: { locale: Locale; state: SearchState; inputRef: React.RefObject<HTMLInputElement | null> }) {
-  const t = copy[locale];
+function PiaDock({ locale, inputRef }: { locale: Locale; inputRef: RefObject<HTMLInputElement | null> }) {
   const [open, setOpen] = useState(false);
-  const [failed, setFailed] = useState(false);
-  const visual = piaInterfaceState[state] as PiaVisualState;
-
-  return (
-    <div className="piaDock">
-      {open && <div className="piaPanel"><strong>{t.piaHelp}</strong><p>{t.piaText}</p><button onClick={() => { inputRef.current?.focus(); setOpen(false); }}>{t.askQuestion}</button><a href="#explorer">{t.exploreResource}</a></div>}
-      <button className="piaTrigger" onClick={() => setOpen(!open)} aria-expanded={open}>
-        <span className="piaMini">{failed ? <b>P</b> : <Image src={piaImages[visual]} width={64} height={64} alt="Pia" onError={() => setFailed(true)} />}</span>
-        <span><b>Pia</b><small>{t.piaRole}</small></span>
-      </button>
-    </div>
-  );
+  const t = copy[locale];
+  return <div className="piaDock">{open && <div className="piaBubble"><strong>Pia</strong><p>{locale === "fr" ? "Je reste disponible pendant que vous travaillez." : "I stay available while you work."}</p><button onClick={() => { inputRef.current?.focus(); setOpen(false); }}>{locale === "fr" ? "Poser une question" : "Ask a question"}</button></div>}<button className="piaTrigger" onClick={() => setOpen(!open)}><img src={piaImages.default} alt="Pia" /><span><b>Pia</b><small>{t.piaRole}</small></span></button></div>;
 }
 
 export default function CampusApp() {
   const [locale, setLocaleState] = useState<Locale>("fr");
-  const [answer, setAnswer] = useState<Answer | null>(null);
-  const [selected, setSelected] = useState<CatalogResource | null>(null);
-  const [pulse, setPulse] = useState("");
-  const [state, setState] = useState<SearchState>("idle");
+  const [mode, setMode] = useState<Mode>("question");
   const [favorites, setFavorites] = useState<Favorite[]>([]);
+  const [ownerKey, setOwnerKeyState] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const saved = localStorage.getItem("paia-locale") as Locale | null;
-    if (saved === "fr" || saved === "en") setLocaleState(saved);
-    const storedFavorites = localStorage.getItem("paia-favorites");
-    if (storedFavorites) {
-      try { setFavorites(JSON.parse(storedFavorites)); } catch { /* ignore invalid local data */ }
-    }
+    const savedLocale = localStorage.getItem("paia-locale");
+    if (savedLocale === "fr" || savedLocale === "en") setLocaleState(savedLocale);
+    const stored = localStorage.getItem("paia-favorites");
+    if (stored) try { setFavorites(JSON.parse(stored)); } catch { /* ignore */ }
+    setOwnerKeyState(sessionStorage.getItem("paia-owner-key") || "");
   }, []);
 
   useEffect(() => { document.documentElement.lang = locale; }, [locale]);
 
-  const setLocale = (next: Locale) => {
-    setLocaleState(next);
-    localStorage.setItem("paia-locale", next);
-  };
-
+  const setLocale = (next: Locale) => { setLocaleState(next); localStorage.setItem("paia-locale", next); };
+  const setOwnerKey = (key: string) => { setOwnerKeyState(key); if (key) sessionStorage.setItem("paia-owner-key", key); };
   const saveFavorite = (favorite: Favorite) => setFavorites((current) => {
     const next = current.some((item) => item.code === favorite.code) ? current : [favorite, ...current];
     localStorage.setItem("paia-favorites", JSON.stringify(next));
     return next;
   });
-
   const removeFavorite = (code: string) => setFavorites((current) => {
     const next = current.filter((item) => item.code !== code);
     localStorage.setItem("paia-favorites", JSON.stringify(next));
     return next;
   });
 
-  const openResource = (resource: CatalogResource) => {
-    setSelected(resource);
-    setAnswer(null);
-    setState("success");
-    setTimeout(() => document.querySelector("#fiche")?.scrollIntoView({ behavior: "smooth" }), 80);
-  };
-
-  const selectPulse = (name: string) => {
-    setPulse(name);
-    document.querySelector("#recherche")?.scrollIntoView({ behavior: "smooth", block: "center" });
-    setTimeout(() => inputRef.current?.focus(), 300);
-  };
-
-  return (
-    <>
-      <Header locale={locale} setLocale={setLocale} />
-      <main>
-        <Hero locale={locale} />
-        <Search locale={locale} pulse={pulse} onAnswer={(value) => { setAnswer(value); setSelected(null); }} onState={setState} inputRef={inputRef} />
-        <Pulses locale={locale} onSelect={selectPulse} />
-        <Explorer locale={locale} onOpen={openResource} onFavorite={saveFavorite} />
-        <KnowledgeSheet locale={locale} answer={answer} selected={selected} onFavorite={saveFavorite} />
-        <Favorites locale={locale} favorites={favorites} remove={removeFavorite} />
-        <About locale={locale} />
-      </main>
-      <footer><div className="shell"><Brand locale={locale} /><p>{copy[locale].footer}</p><Image src="/brand/03_MMPA_Circulaire_Logo.png" width={56} height={56} alt="MMPA" /></div></footer>
-      <PiaAssistant locale={locale} state={state} inputRef={inputRef} />
-    </>
-  );
+  return <>
+    <Header locale={locale} setLocale={setLocale} setMode={setMode} />
+    <main>
+      <Hero locale={locale} />
+      <WorkspaceChooser locale={locale} mode={mode} setMode={setMode} />
+      <div className="workspace shell" id="workspace">
+        {mode === "question" && <QuestionPanel locale={locale} ownerKey={ownerKey} setOwnerKey={setOwnerKey} saveFavorite={saveFavorite} />}
+        {mode === "documents" && <ResourcePicker locale={locale} mode="documents" ownerKey={ownerKey} setOwnerKey={setOwnerKey} saveFavorite={saveFavorite} />}
+        {mode === "revision" && <ResourcePicker locale={locale} mode="revision" ownerKey={ownerKey} setOwnerKey={setOwnerKey} saveFavorite={saveFavorite} />}
+        {mode === "favorites" && <FavoritesPanel locale={locale} favorites={favorites} remove={removeFavorite} />}
+        {mode === "about" && <AboutPanel locale={locale} />}
+      </div>
+    </main>
+    <footer><div className="shell"><Brand locale={locale} /><p>Apprendre. Comprendre. Progresser.</p><Image src="/brand/03_MMPA_Circulaire_Logo.png" width={50} height={50} alt="MMPA" /></div></footer>
+    <PiaDock locale={locale} inputRef={inputRef} />
+  </>;
 }
