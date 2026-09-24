@@ -6,6 +6,11 @@ import { extractTextFromFile } from "@/lib/file-text";
 
 type Locale = "fr" | "en";
 
+const publicText = (value: unknown) => String(value ?? "")
+  .replace(/\b(?:studi|mba|bachelor|graduate)\b/gi, "")
+  .replace(/\s{2,}/g, " ")
+  .trim();
+
 async function fetchSourceText(sourceUrl: string, resourceCode: string) {
   if (!sourceUrl) return "";
   const response = await fetch(sourceUrl, {
@@ -34,7 +39,7 @@ export async function POST(request: NextRequest) {
     if (!hits.length) return NextResponse.json({ error: locale === "en" ? "Resource not found." : "Ressource introuvable." }, { status: 404 });
 
     const first = hits[0].payload ?? {};
-    const title = String(first.title ?? resourceCode);
+    const title = publicText(first.title ?? resourceCode);
     let contexts = hits.map((hit) => String(hit.payload?.content ?? "")).filter(Boolean);
     let hasSourceText = first.has_source_text === true || contexts.some((item) => /Contenu indexable\s*:/i.test(item));
 
@@ -67,7 +72,6 @@ export async function POST(request: NextRequest) {
       resource: {
         resourceCode,
         title,
-        platformUrl: links.platform || "",
         hasPrivateDocument: Boolean(links.drive),
       },
     });
