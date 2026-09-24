@@ -124,7 +124,7 @@ function RichText({ text }: { text: string }) {
 function CompactSources({ locale, resources, openDocument }: { locale: Locale; resources: ResourceRecommendation[]; openDocument: (resource: ResourceRecommendation) => void }) {
   const t = copy[locale];
   if (!resources.length) return null;
-  return <section className="compactSources"><h3>📚 {t.resourcesUsed}</h3><ul>{resources.map((resource) => <li key={resource.resourceCode}><code>{resource.resourceCode}</code><span>{resource.title}</span><span className="sourceActions">{resource.hasPrivateDocument && <button onClick={() => openDocument(resource)}>{t.openDocument}</button>}{resource.platformUrl && <a href={resource.platformUrl} target="_blank" rel="noreferrer">{t.platform}</a>}</span></li>)}</ul></section>;
+  return <section className="compactSources"><h3>📚 {t.resourcesUsed}</h3><ul>{resources.map((resource) => <li key={resource.resourceCode}><code>{resource.resourceCode}</code><span>{resource.title}</span><span className="sourceActions">{resource.hasPrivateDocument && <button onClick={() => openDocument(resource)}>{t.openDocument}</button>}</span></li>)}</ul></section>;
 }
 
 function QuestionPanel({ locale, ownerKey, setOwnerKey, saveFavorite }: { locale: Locale; ownerKey: string; setOwnerKey: (key: string) => void; saveFavorite: (favorite: Favorite) => void }) {
