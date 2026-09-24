@@ -14,30 +14,51 @@ type CatalogResource = {
   resourceType: string;
   title: string;
   pulse: string;
-  platformUrl?: string;
   hasPrivateDocument: boolean;
   hasSourceText: boolean;
 };
 
 const text = (value: unknown) => typeof value === "string" ? value.trim() : "";
+const publicText = (value: unknown) => text(value)
+  .replace(/\b(?:studi|mba|bachelor|graduate)\b/gi, "")
+  .replace(/\s{2,}/g, " ")
+  .replace(/\s+([:;,])/g, "$1")
+  .trim();
+
+function corpusName(project: unknown, fallback: unknown) {
+  const names: Record<string, string> = {
+    "14": "Digital",
+    "15": "Formateur",
+    "16": "Python",
+    "17": "RH",
+    "18": "Paie",
+    "19": "Divers",
+  };
+  return names[text(project)] || publicText(fallback) || "Corpus non renseigné";
+}
+
+function neutralBlock(code: string, title: unknown) {
+  if (/^B0{1,2}$/i.test(code)) return "Introduction";
+  return publicText(title) || "Bloc non renseigné";
+}
 
 function publicResource(payload: QdrantPayload): CatalogResource | null {
   const resourceCode = text(payload.resource_code);
-  const title = text(payload.title);
-  const resourceType = text(payload.resource_type);
+  const title = publicText(payload.title);
+  const resourceType = publicText(payload.resource_type);
+  const blockCode = text(payload.block_code);
   if (!resourceCode || !title || payload.reserved === true || resourceType.toUpperCase() === "EMPTY") return null;
   const links = getResourceLinks(resourceCode);
   return {
     resourceCode,
-    formation: text(payload.formation) || "Parcours non renseigné",
-    blockCode: text(payload.block_code),
-    blockTitle: text(payload.block_title) || "Bloc non renseigné",
+    formation: corpusName(payload.project, payload.formation),
+    blockCode,
+    blockTitle: neutralBlock(blockCode, payload.block_title),
     moduleCode: text(payload.module_code),
-    moduleTitle: text(payload.module_title) || "Module non renseigné",
+    moduleTitle: publicText(payload.module_title) || "Module non renseigné",
     resourceType: resourceType || "Ressource",
     title,
     pulse: text(payload.pulse),
-    ...(links.platform ? { platformUrl: links.platform } : {}),
     hasPrivateDocument: Boolean(links.drive),
     hasSourceText: payload.has_source_text === true,
   };
@@ -59,7 +80,7 @@ export async function GET() {
         body: JSON.stringify({
           limit: 256,
           with_payload: [
-            "resource_code", "formation", "block_code", "block_title", "module_code", "module_title",
+            "resource_code", "project", "formation", "block_code", "block_title", "module_code", "module_title",
             "resource_type", "title", "pulse", "reserved", "has_source_text"
           ],
           with_vector: false,
