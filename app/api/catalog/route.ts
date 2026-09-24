@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { publicText } from "@/lib/corpus";
+import { getResourceLinks } from "@/lib/resource-links";
 
 type QdrantPayload = Record<string, string | number | boolean>;
 type QdrantPoint = { payload?: QdrantPayload };
@@ -14,6 +14,7 @@ type CatalogResource = {
   resourceType: string;
   title: string;
   pulse: string;
+  platformUrl?: string;
   hasPrivateDocument: boolean;
   hasSourceText: boolean;
 };
@@ -22,20 +23,22 @@ const text = (value: unknown) => typeof value === "string" ? value.trim() : "";
 
 function publicResource(payload: QdrantPayload): CatalogResource | null {
   const resourceCode = text(payload.resource_code);
-  const title = publicText(payload.title);
-  const resourceType = publicText(payload.resource_type);
+  const title = text(payload.title);
+  const resourceType = text(payload.resource_type);
   if (!resourceCode || !title || payload.reserved === true || resourceType.toUpperCase() === "EMPTY") return null;
+  const links = getResourceLinks(resourceCode);
   return {
     resourceCode,
-    formation: publicText(payload.formation) || "Parcours non renseigné",
+    formation: text(payload.formation) || "Parcours non renseigné",
     blockCode: text(payload.block_code),
-    blockTitle: publicText(payload.block_title) || "Bloc non renseigné",
+    blockTitle: text(payload.block_title) || "Bloc non renseigné",
     moduleCode: text(payload.module_code),
-    moduleTitle: publicText(payload.module_title) || "Module non renseigné",
+    moduleTitle: text(payload.module_title) || "Module non renseigné",
     resourceType: resourceType || "Ressource",
     title,
     pulse: text(payload.pulse),
-    hasPrivateDocument: Boolean(text(payload.private_document_url)),
+    ...(links.platform ? { platformUrl: links.platform } : {}),
+    hasPrivateDocument: Boolean(links.drive),
     hasSourceText: payload.has_source_text === true,
   };
 }
@@ -57,7 +60,7 @@ export async function GET() {
           limit: 256,
           with_payload: [
             "resource_code", "formation", "block_code", "block_title", "module_code", "module_title",
-            "resource_type", "title", "pulse", "reserved", "has_source_text", "private_document_url"
+            "resource_type", "title", "pulse", "reserved", "has_source_text"
           ],
           with_vector: false,
           ...(offset !== undefined && offset !== null ? { offset } : {}),
