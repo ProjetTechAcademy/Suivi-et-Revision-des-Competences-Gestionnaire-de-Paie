@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { FormEvent, useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import type { ResourceRecommendation } from "@/lib/corpus";
 import { copy, type Locale } from "@/lib/i18n";
 import { piaImages } from "@/lib/pia";
@@ -63,17 +63,62 @@ function inline(text: string) {
   return text.split(/(\*\*[^*]+\*\*)/g).map((part, index) => part.startsWith("**") && part.endsWith("**") ? <strong key={index}>{part.slice(2, -2)}</strong> : <span key={index}>{part}</span>);
 }
 
+function splitTableRow(line: string) {
+  return line
+    .replace(/^\|/, "")
+    .replace(/\|$/, "")
+    .split("|")
+    .map((cell) => cell.trim());
+}
+
 function RichText({ text }: { text: string }) {
-  return <div className="richText">{text.split(/\n/).map((raw, index) => {
-    const line = raw.trim();
-    if (!line) return <div className="richSpace" key={index} />;
-    if (line.startsWith("### ")) return <h4 key={index}>{inline(line.slice(4))}</h4>;
-    if (line.startsWith("## ")) return <h3 key={index}>{inline(line.slice(3))}</h3>;
-    if (line.startsWith("# ")) return <h2 key={index}>{inline(line.slice(2))}</h2>;
-    if (/^[-•]\s+/.test(line)) return <p className="richBullet" key={index}>{inline(line.replace(/^[-•]\s+/, ""))}</p>;
-    if (/^\d+[.)]\s+/.test(line)) return <p className="richNumber" key={index}>{inline(line)}</p>;
-    return <p key={index}>{inline(line)}</p>;
-  })}</div>;
+  const lines = text.split(/\n/);
+  const nodes: ReactNode[] = [];
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index].trim();
+    const next = lines[index + 1]?.trim() || "";
+
+    if (
+      line.includes("|") &&
+      /^\|?\s*:?-{3,}/.test(next) &&
+      next.includes("|")
+    ) {
+      const headers = splitTableRow(line);
+      const rows: string[][] = [];
+      index += 2;
+
+      while (index < lines.length) {
+        const row = lines[index].trim();
+        if (!row || !row.includes("|")) {
+          index -= 1;
+          break;
+        }
+        rows.push(splitTableRow(row));
+        index += 1;
+      }
+
+      nodes.push(
+        <div className="richTableWrap" key={`table-${index}`}>
+          <table className="richTable">
+            <thead><tr>{headers.map((cell, cellIndex) => <th key={cellIndex}>{inline(cell)}</th>)}</tr></thead>
+            <tbody>{rows.map((row, rowIndex) => <tr key={rowIndex}>{headers.map((_, cellIndex) => <td key={cellIndex}>{inline(row[cellIndex] || "")}</td>)}</tr>)}</tbody>
+          </table>
+        </div>
+      );
+      continue;
+    }
+
+    if (!line) { nodes.push(<div className="richSpace" key={index} />); continue; }
+    if (line.startsWith("### ")) { nodes.push(<h4 key={index}>{inline(line.slice(4))}</h4>); continue; }
+    if (line.startsWith("## ")) { nodes.push(<h3 key={index}>{inline(line.slice(3))}</h3>); continue; }
+    if (line.startsWith("# ")) { nodes.push(<h2 key={index}>{inline(line.slice(2))}</h2>); continue; }
+    if (/^[-•]\s+/.test(line)) { nodes.push(<p className="richBullet" key={index}>{inline(line.replace(/^[-•]\s+/, ""))}</p>); continue; }
+    if (/^\d+[.)]\s+/.test(line)) { nodes.push(<p className="richNumber" key={index}>{inline(line)}</p>); continue; }
+    nodes.push(<p key={index}>{inline(line)}</p>);
+  }
+
+  return <div className="richText">{nodes}</div>;
 }
 
 function CompactSources({ locale, resources, openDocument }: { locale: Locale; resources: ResourceRecommendation[]; openDocument: (resource: ResourceRecommendation) => void }) {
@@ -170,7 +215,7 @@ function ResourcePicker({ locale, mode, ownerKey, setOwnerKey, saveFavorite }: {
   };
 
   return <section className="toolPanel">
-    <header className="panelIntro"><span className="eyebrow">{mode === "documents" ? "BIBLIOTHÈQUE" : "RÉVISION"}</span><h2>{t.explorerTitle}</h2><p>{t.explorerText}</p></header>
+    <header className="panelIntro"><span className="eyebrow">{mode === "documents" ? "BIBLIOTHÈQUE" : "FICHE PIA"}</span><h2>{t.explorerTitle}</h2><p>{t.explorerText}</p></header>
     {loading ? <p className="notice">{t.loading}</p> : <>
       <div className="pickerGrid">
         <label>{t.parcours}<select value={parcours} onChange={(e) => { setParcours(e.target.value); setBlock(""); setModule(""); }}><option value="">{t.chooseParcours}</option>{parcoursList.map((item) => <option key={item}>{item}</option>)}</select></label>
@@ -186,7 +231,7 @@ function ResourcePicker({ locale, mode, ownerKey, setOwnerKey, saveFavorite }: {
       </span></div>) : <p className="notice">{t.noResources}</p>}</div>}
     </>}
     {message && <p className="notice error">{message}</p>}
-    {revision && <article className="resultSheet revisionSheet" id="revision-result"><header><span className="eyebrow">FICHE PRATIQUE</span><h2>{revision.title}</h2><div><code>{revision.resourceCode}</code><button onClick={() => saveFavorite({ kind: "revision", code: revision.resourceCode, title: revision.title })}>♡ {t.favoriteAdd}</button><button onClick={() => window.print()}>▣ {t.print}</button></div></header><RichText text={revision.content} /></article>}
+    {revision && <article className="resultSheet revisionSheet" id="revision-result"><header><span className="eyebrow">FICHE PIA</span><h2>{revision.title}</h2><div><code>{revision.resourceCode}</code><button onClick={() => saveFavorite({ kind: "revision", code: revision.resourceCode, title: revision.title })}>♡ {t.favoriteAdd}</button><button onClick={() => window.print()}>▣ {t.print}</button></div></header><RichText text={revision.content} /></article>}
   </section>;
 }
 
