@@ -1,4 +1,6 @@
-const main = "/brand/mascotte/PAIA_000_Mascotte_principale_V001.webp";
+import { piaMainDataUri } from "@/lib/pia-image";
+
+const main = piaMainDataUri;
 
 export const piaImages = {
   default: main,
