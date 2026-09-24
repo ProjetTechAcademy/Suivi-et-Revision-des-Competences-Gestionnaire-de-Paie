@@ -13,6 +13,9 @@ type CatalogResource = {
   resourceType: string;
   title: string;
   pulse: string;
+  platformUrl?: string;
+  hasPrivateDocument: boolean;
+  hasSourceText: boolean;
 };
 
 const text = (value: unknown) => typeof value === "string" ? value.trim() : "";
@@ -22,6 +25,7 @@ function publicResource(payload: QdrantPayload): CatalogResource | null {
   const title = text(payload.title);
   const resourceType = text(payload.resource_type);
   if (!resourceCode || !title || payload.reserved === true || resourceType.toUpperCase() === "EMPTY") return null;
+  const platformUrl = text(payload.platform_url);
   return {
     resourceCode,
     formation: text(payload.formation) || "Parcours non renseigné",
@@ -32,6 +36,9 @@ function publicResource(payload: QdrantPayload): CatalogResource | null {
     resourceType: resourceType || "Ressource",
     title,
     pulse: text(payload.pulse),
+    ...(platformUrl ? { platformUrl } : {}),
+    hasPrivateDocument: Boolean(text(payload.private_document_url) || text(payload.source_url)),
+    hasSourceText: payload.has_source_text === true,
   };
 }
 
@@ -50,7 +57,11 @@ export async function GET() {
         headers: { "api-key": apiKey, "Content-Type": "application/json" },
         body: JSON.stringify({
           limit: 256,
-          with_payload: ["resource_code", "formation", "block_code", "block_title", "module_code", "module_title", "resource_type", "title", "pulse", "reserved"],
+          with_payload: [
+            "resource_code", "formation", "block_code", "block_title", "module_code", "module_title",
+            "resource_type", "title", "pulse", "reserved", "platform_url", "private_document_url",
+            "source_url", "has_source_text"
+          ],
           with_vector: false,
           ...(offset !== undefined && offset !== null ? { offset } : {}),
         }),
@@ -64,6 +75,7 @@ export async function GET() {
       }
       offset = data.result?.next_page_offset;
     } while (offset !== undefined && offset !== null);
+
     return NextResponse.json({ resources: [...resources.values()], connected: true });
   } catch (error) {
     console.error("Corpus catalog read error", error);
