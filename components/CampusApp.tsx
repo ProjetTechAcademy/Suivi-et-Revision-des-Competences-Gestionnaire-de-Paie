@@ -225,8 +225,8 @@ function ResourcePicker({ locale, mode, ownerKey, setOwnerKey, saveFavorite }: {
       {module && <div className="resourceList">{visible.length ? visible.map((resource) => <div className="resourceRow" key={resource.resourceCode}><span className="resourceType">{resource.resourceType}</span><code>{resource.resourceCode}</code><strong>{resource.title}</strong><span className="rowActions">
         <button className="ghost" onClick={() => saveFavorite({ kind: "resource", code: resource.resourceCode, title: resource.title })}>♡</button>
         {mode === "documents" && resource.hasPrivateDocument && <button onClick={() => openDocument(resource)}>{t.openDocument}</button>}
-        {mode === "documents" && resource.platformUrl && <a href={resource.platformUrl} target="_blank" rel="noreferrer">{t.platform}</a>}
-        {mode === "documents" && !resource.hasPrivateDocument && !resource.platformUrl && <small>{t.sourceNotLinked}</small>}
+        
+        {mode === "documents" && !resource.hasPrivateDocument && <small>{t.sourceNotLinked}</small>}
         <button className="primary" onClick={() => generateRevision(resource)} disabled={generating === resource.resourceCode}>{generating === resource.resourceCode ? t.generatingRevision : t.generateRevision}</button>
       </span></div>) : <p className="notice">{t.noResources}</p>}</div>}
     </>}
