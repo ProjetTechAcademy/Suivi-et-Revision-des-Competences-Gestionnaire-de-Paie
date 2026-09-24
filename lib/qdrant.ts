@@ -161,3 +161,37 @@ export async function qdrantStats() {
     indexed: data.result?.indexed_vectors_count ?? 0,
   };
 }
+
+
+export async function getQdrantResource(resourceCode: string) {
+  await ensureQdrantCollection();
+  const response = await request(`/collections/${encodeURIComponent(COLLECTION)}/points/scroll`, {
+    method: "POST",
+    body: JSON.stringify({
+      limit: 1,
+      with_payload: true,
+      with_vector: false,
+      filter: { must: [{ key: "resource_code", match: { value: resourceCode } }] },
+    }),
+  });
+  if (!response.ok) throw new Error(`QDRANT_RESOURCE_FAILED:${response.status}`);
+  const data = await response.json() as { result?: { points?: QdrantSearchHit[] } };
+  return data.result?.points?.[0] ?? null;
+}
+
+export async function getQdrantResourceChunks(resourceCode: string, limit = 120) {
+  await ensureQdrantCollection();
+  const response = await request(`/collections/${encodeURIComponent(COLLECTION)}/points/scroll`, {
+    method: "POST",
+    body: JSON.stringify({
+      limit,
+      with_payload: true,
+      with_vector: false,
+      filter: { must: [{ key: "resource_code", match: { value: resourceCode } }] },
+    }),
+  });
+  if (!response.ok) throw new Error(`QDRANT_RESOURCE_CHUNKS_FAILED:${response.status}`);
+  const data = await response.json() as { result?: { points?: QdrantSearchHit[] } };
+  return (data.result?.points ?? [])
+    .sort((a, b) => Number(a.payload?.chunk_index ?? 0) - Number(b.payload?.chunk_index ?? 0));
+}

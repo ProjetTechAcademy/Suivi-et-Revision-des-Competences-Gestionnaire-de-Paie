@@ -16,12 +16,19 @@ export type CorpusResource = {
   extractedText: string;
   reserved: boolean;
   hasTranscript: boolean;
+  platformUrl: string;
+  privateDocumentUrl: string;
+  sourceUrl: string;
 };
 
 export type ResourceRecommendation = Pick<
   CorpusResource,
   "resourceCode" | "formation" | "blockCode" | "blockTitle" | "moduleCode" | "moduleTitle" | "resourceType" | "title"
-> & { reason: string };
+> & {
+  reason: string;
+  platformUrl?: string;
+  hasPrivateDocument?: boolean;
+};
 
 const PROJECT_15_BLOCK_TITLES: Record<string, string> = {
   B00: "Réussir ma formation Graduate Formateur professionnel d'adultes",
@@ -66,23 +73,26 @@ export function normalizeCorpusResource(input: Record<string, unknown>): { resou
     : clean(keywordValue).split(/[,;|]/).map((item) => item.trim()).filter(Boolean);
 
   const resource: CorpusResource = {
-    resourceCode: clean(input.resourceCode ?? input.code ?? input.codeRessource),
+    resourceCode: clean(input.resourceCode ?? input.code ?? input.codeRessource ?? input["Code original"]),
     project,
-    formation: clean(input.formation),
+    formation: clean(input.formation ?? input["Formation"]),
     blockCode,
     blockTitle,
     moduleCode,
     moduleTitle,
-    resourceType: clean(input.resourceType ?? input.type ?? input.typeRessource),
-    title: clean(input.title ?? input.titre),
-    pulse: clean(input.pulse ?? input.domain ?? input.domaine),
-    subdomain: clean(input.subdomain ?? input.sousDomaine),
+    resourceType: clean(input.resourceType ?? input.type ?? input.typeRessource ?? input["Type ressource"]),
+    title: clean(input.title ?? input.titre ?? input["Titre ressource"]),
+    pulse: clean(input.pulse ?? input.domain ?? input.domaine ?? input["Domaine PAÏA auto"]),
+    subdomain: clean(input.subdomain ?? input.sousDomaine ?? input["Sous-domaine auto"]),
     keywords,
-    regulatory: bool(input.regulatory ?? input.caractereReglementaire),
-    updatedAt: clean(input.updatedAt ?? input.year ?? input.annee ?? input.dateMiseAJour),
+    regulatory: bool(input.regulatory ?? input.caractereReglementaire ?? input["Réglementaire / temporel ?"]),
+    updatedAt: clean(input.updatedAt ?? input.year ?? input.annee ?? input.dateMiseAJour ?? input["Année MAJ"] ?? input["Dernière modification"]),
     extractedText: clean(input.extractedText ?? input.texteExtrait ?? input.transcript ?? input.transcription),
     reserved: bool(input.reserved ?? input.reservee ?? input.positionReservee),
     hasTranscript: bool(input.hasTranscript) || Boolean(clean(input.transcript ?? input.transcription)),
+    platformUrl: clean(input.platformUrl ?? input.studiUrl ?? input.lienStudi ?? input["Lien Studi"]),
+    privateDocumentUrl: clean(input.privateDocumentUrl ?? input.driveUrl ?? input.lienDrivePrincipal ?? input["Lien Drive principal"]),
+    sourceUrl: clean(input.sourceUrl ?? input.lienSourcePdf ?? input["Lien source / PDF"]),
   };
 
   const warnings: string[] = [];
@@ -111,7 +121,7 @@ export function buildIndexDocument(resource: CorpusResource) {
   ].join("\n");
   const content = resource.extractedText
     ? `${metadata}\n\nContenu indexable :\n${resource.extractedText}`
-    : `${metadata}\n\nCette ressource ne dispose pas de contenu plein texte. Elle reste recommandable à partir de ses métadonnées.`;
+    : `${metadata}\n\nCette ressource ne dispose pas encore de contenu plein texte indexé.`;
   return content;
 }
 
@@ -129,5 +139,9 @@ export function publicAttributes(resource: CorpusResource): Record<string, strin
     pulse: resource.pulse.slice(0, 256),
     regulatory: resource.regulatory,
     reserved: resource.reserved,
+    has_source_text: Boolean(resource.extractedText),
+    platform_url: resource.platformUrl.slice(0, 2000),
+    private_document_url: resource.privateDocumentUrl.slice(0, 2000),
+    source_url: resource.sourceUrl.slice(0, 2000),
   };
 }
