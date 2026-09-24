@@ -1,189 +1,323 @@
 "use client";
 
 import Image from "next/image";
-import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import type { ResourceRecommendation } from "@/lib/corpus";
-import { formations, pulses } from "@/lib/data";
+import { copy, type Locale } from "@/lib/i18n";
+import { piaImages, piaInterfaceState, type PiaVisualState } from "@/lib/pia";
 import { ThemeToggle } from "./ThemeToggle";
 
 type Answer = { title: string; summary: string; resources?: ResourceRecommendation[] };
-type Formation = keyof typeof formations;
+type CatalogResource = Omit<ResourceRecommendation, "reason"> & { pulse: string };
+type Favorite = { kind: "resource" | "answer"; code: string; title: string };
+type SearchState = "idle" | "listening" | "searching" | "success" | "error";
 
-const pulseStyles = ["blue", "purple", "teal", "rose", "gold", "green", "indigo", "navy"];
+const pulses = [
+  ["Paie & Social", "Paie, déclaratif et protection sociale", "▦"],
+  ["RH", "Talents, recrutement et parcours", "◇"],
+  ["SIRH", "Outils, flux et interopérabilité", "⌘"],
+  ["Droit social", "Relations de travail et réglementation", "§"],
+  ["AMOA & Projet", "Cadrage, conduite et recette", "◎"],
+  ["Management", "Organisation et pratiques collectives", "△"],
+  ["Digital & IA", "IA, automatisation et usages", "✦"],
+  ["Tech", "Développement, données et tests", "</>"],
+] as const;
 
-function Brand({ compact = false }: { compact?: boolean }) {
+function Brand({ locale }: { locale: Locale }) {
   return (
-    <span className={compact ? "brand compact" : "brand"}>
-      <Image src="/brand/02_PAIA_Circulaire_Logo_Compact.png" width={56} height={56} alt="Logo officiel PAÏA compact" priority />
-      <span><strong>Campus PAÏA</strong><small>Savoir aujourd’hui. Agir demain.</small></span>
+    <span className="brand">
+      <Image src="/brand/02_PAIA_Circulaire_Logo_Compact.png" width={56} height={56} alt="Logo PAÏA" priority />
+      <span><strong>Corpus Campus PAÏA</strong><small>{copy[locale].brandTagline}</small></span>
     </span>
   );
 }
 
-function Header() {
+function LanguageToggle({ locale, setLocale }: { locale: Locale; setLocale: (locale: Locale) => void }) {
+  return (
+    <div className="languageToggle" role="group" aria-label={copy[locale].languageLabel}>
+      <button className={locale === "fr" ? "active" : ""} onClick={() => setLocale("fr")} aria-pressed={locale === "fr"}>FR</button>
+      <button className={locale === "en" ? "active" : ""} onClick={() => setLocale("en")} aria-pressed={locale === "en"}>EN</button>
+    </div>
+  );
+}
+
+function Header({ locale, setLocale }: { locale: Locale; setLocale: (locale: Locale) => void }) {
   const [open, setOpen] = useState(false);
+  const t = copy[locale];
   return (
     <header className="siteHeader">
       <div className="headerInner shell">
-        <a href="#accueil" aria-label="Campus PAÏA — Accueil"><Brand /></a>
-        <button className="menuButton" onClick={() => setOpen(!open)} aria-expanded={open} aria-label={open ? "Fermer le menu" : "Ouvrir le menu"}>☰</button>
-        <nav className={open ? "mainNav open" : "mainNav"} aria-label="Navigation principale">
-          <a className="active" href="#accueil">⌂ <span>Accueil</span></a>
-          <a href="#explorer">◉ <span>Explorer</span></a>
-          <a href="#enonces">▧ <span>Énoncés</span></a>
-          <a href="#favoris">♡ <span>Mes favoris</span></a>
-          <a href="#apropos">ⓘ <span>À propos</span></a>
+        <a href="#accueil" aria-label="Corpus Campus PAÏA"><Brand locale={locale} /></a>
+        <button className="menuButton" onClick={() => setOpen(!open)} aria-expanded={open} aria-label={open ? t.closeMenu : t.openMenu}>☰</button>
+        <nav className={`mainNav ${open ? "open" : ""}`} aria-label={t.navigation}>
+          <a href="#accueil">{t.home}</a>
+          <a href="#explorer">{t.explorer}</a>
+          <a href="#recherche">{t.search}</a>
+          <a href="#favoris">{t.favorites}</a>
+          <a href="#apropos">{t.about}</a>
         </nav>
-        <div className="headerTools">
-          <ThemeToggle />
-          <button className="language" aria-label="Langue actuelle : français">◎ <span>FR</span>⌄</button>
-          <button className="profile" aria-label="Profil de Mathilde"><span>M</span><b>Mathilde</b>⌄</button>
-        </div>
+        <div className="headerTools"><LanguageToggle locale={locale} setLocale={setLocale} /><ThemeToggle /></div>
       </div>
     </header>
   );
 }
 
-function PiaAssistant() {
-  const [panel, setPanel] = useState(false);
-  const speech = (action: "play" | "pause" | "resume" | "stop") => {
-    if (!("speechSynthesis" in window)) return;
-    if (action === "pause") return speechSynthesis.pause();
-    if (action === "resume") return speechSynthesis.resume();
-    if (action === "stop") return speechSynthesis.cancel();
-    speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance("Bonjour ! Je suis Pia, votre compagne de recherche. Posez-moi une question ou explorez un Pulse !");
-    utterance.lang = "fr-FR";
-    speechSynthesis.speak(utterance);
+function Hero({ locale }: { locale: Locale }) {
+  const t = copy[locale];
+  return (
+    <section className="hero" id="accueil">
+      <div className="heroInner shell">
+        <div className="heroCopy">
+          <span className="overline">{t.heroOverline}</span>
+          <h1>{t.heroTitleA}<br /><em>{t.heroTitleB}</em></h1>
+          <p>{t.heroText}</p>
+          <div className="valueList"><span>{t.valueSearch}</span><span>{t.valueContext}</span><span>{t.valuePrivate}</span></div>
+        </div>
+        <div className="heroPia" aria-hidden="true">
+          <span className="heroHalo" />
+          <Image src={piaImages.default} width={640} height={640} alt="" priority />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Search({ locale, pulse, onAnswer, onState, inputRef }: { locale: Locale; pulse: string; onAnswer: (answer: Answer) => void; onState: (state: SearchState) => void; inputRef: React.RefObject<HTMLInputElement | null> }) {
+  const t = copy[locale];
+  const [query, setQuery] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!query.trim()) return;
+    setLoading(true);
+    setError("");
+    onState("searching");
+
+    try {
+      const response = await fetch("/api/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query, pulse, locale }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || t.searchUnavailable);
+      onAnswer(data);
+      onState("success");
+      window.setTimeout(() => document.querySelector("#fiche")?.scrollIntoView({ behavior: "smooth" }), 80);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : t.searchUnavailable);
+      onState("error");
+    } finally {
+      setLoading(false);
+    }
   };
+
+  const examples = locale === "fr"
+    ? ["Expliquer une notion de droit social", "Comparer deux méthodes de gestion de projet", "Comprendre les tests d’une API"]
+    : ["Explain an employment-law concept", "Compare two project methods", "Understand API testing"];
+
+  return (
+    <section className="searchArea shell" id="recherche" aria-labelledby="search-title">
+      <div className="searchHeading"><span className="eyebrow">{t.searchOverline}</span><h2 id="search-title">{t.searchTitle}</h2><p>{t.searchText}</p></div>
+      <form className="searchForm" onSubmit={submit}>
+        <span aria-hidden="true">⌕</span>
+        <input ref={inputRef} value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t.searchPlaceholder} aria-label={t.searchInputLabel} />
+        <button disabled={loading} aria-label={t.searchButton}>{loading ? "…" : "→"}</button>
+      </form>
+      <div className="suggestions"><span>{t.suggestions}</span>{examples.map((item) => <button key={item} type="button" onClick={() => { setQuery(item); inputRef.current?.focus(); }}>{item}</button>)}</div>
+      {pulse && <div className="activeFilter">Pulse : <b>{pulse}</b></div>}
+      {loading && <div className="searchLoading" role="status"><i /><div><b>{t.searchingTitle}</b><span>{t.searchingText}</span></div></div>}
+      {error && <p className="searchError" role="alert">{error}</p>}
+    </section>
+  );
+}
+
+function Pulses({ locale, onSelect }: { locale: Locale; onSelect: (name: string) => void }) {
+  const t = copy[locale];
+  return (
+    <section className="pulseSection shell">
+      <div className="sectionTitle"><span className="pulseBolt">ϟ</span><div><h2>{t.pulseTitle}</h2><p>{t.pulseText}</p></div></div>
+      <div className="pulseGrid">{pulses.map(([name, description, icon]) => <button className="pulseCard" key={name} onClick={() => onSelect(name)}><span className="pulseIcon">{icon}</span><b>{name}</b><p>{description}</p><i>{t.choose} →</i></button>)}</div>
+    </section>
+  );
+}
+
+function Explorer({ locale, onOpen, onFavorite }: { locale: Locale; onOpen: (resource: CatalogResource) => void; onFavorite: (favorite: Favorite) => void }) {
+  const t = copy[locale];
+  const [resources, setResources] = useState<CatalogResource[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [connected, setConnected] = useState(true);
+  const [parcours, setParcours] = useState("");
+  const [block, setBlock] = useState("");
+  const [module, setModule] = useState("");
+
+  useEffect(() => {
+    fetch("/api/catalog")
+      .then(async (response) => {
+        const data = await response.json();
+        setResources(data.resources ?? []);
+        setConnected(Boolean(data.connected));
+      })
+      .catch(() => setConnected(false))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const parcoursList = useMemo(() => [...new Set(resources.map((r) => r.formation).filter(Boolean))].sort(), [resources]);
+  const byParcours = resources.filter((r) => r.formation === parcours);
+  const blocks = [...new Map(byParcours.map((r) => [r.blockCode || r.blockTitle, `${r.blockCode}${r.blockCode && r.blockTitle ? " — " : ""}${r.blockTitle}`])).entries()];
+  const byBlock = byParcours.filter((r) => (r.blockCode || r.blockTitle) === block);
+  const modules = [...new Map(byBlock.map((r) => [r.moduleCode || r.moduleTitle, `${r.moduleCode}${r.moduleCode && r.moduleTitle ? " — " : ""}${r.moduleTitle}`])).entries()];
+  const visible = byBlock.filter((r) => (r.moduleCode || r.moduleTitle) === module);
+
+  return (
+    <section className="explorer shell" id="explorer">
+      <header><span className="overline">{t.libraryOverline}</span><h2>{t.explorerTitle}</h2><p>{t.explorerText}</p></header>
+      <div className="steps" aria-label={t.progress}>
+        <span className="ready"><b>1</b>{t.parcours}</span>
+        <span className={parcours ? "ready" : ""}><b>2</b>{t.block}</span>
+        <span className={block ? "ready" : ""}><b>3</b>{t.module}</span>
+        <span className={module ? "ready" : ""}><b>4</b>{t.resource}</span>
+      </div>
+
+      <div className="explorerCard">
+        {loading ? <div className="catalogState"><i /><h3>{t.catalogLoading}</h3></div> : !connected ? <div className="catalogState"><h3>{t.catalogDisconnected}</h3><p>{t.catalogDisconnectedText}</p></div> : !resources.length ? <div className="catalogState"><h3>{t.catalogEmpty}</h3></div> : <>
+          <label>{t.parcours}<select value={parcours} onChange={(e) => { setParcours(e.target.value); setBlock(""); setModule(""); }}><option value="">{t.chooseParcours}</option>{parcoursList.map((item) => <option key={item}>{item}</option>)}</select></label>
+          {parcours && <label>{t.block}<select value={block} onChange={(e) => { setBlock(e.target.value); setModule(""); }}><option value="">{t.chooseBlock}</option>{blocks.map(([key, label]) => <option value={key} key={key}>{label}</option>)}</select></label>}
+          {block && <label>{t.module}<select value={module} onChange={(e) => setModule(e.target.value)}><option value="">{t.chooseModule}</option>{modules.map(([key, label]) => <option value={key} key={key}>{label}</option>)}</select></label>}
+          {module && <div className="resourceGrid">{visible.map((resource) => <article key={resource.resourceCode}><span>{resource.resourceType}</span><h3>{resource.title}</h3><p>{resource.resourceCode}{resource.pulse ? ` · ${resource.pulse}` : ""}</p><div><button onClick={() => onOpen(resource)}>{t.viewSheet}</button><button aria-label={t.addFavorite} onClick={() => onFavorite({ kind: "resource", code: resource.resourceCode, title: resource.title })}>♡</button></div></article>)}</div>}
+        </>}
+      </div>
+    </section>
+  );
+}
+
+function KnowledgeSheet({ locale, answer, selected, onFavorite }: { locale: Locale; answer: Answer | null; selected: CatalogResource | null; onFavorite: (favorite: Favorite) => void }) {
+  if (!answer && !selected) return null;
+
+  const t = copy[locale];
+  const title = answer?.title || selected?.title || "";
+  const summary = answer?.summary || t.resourceSelected;
+  const resources = answer?.resources ?? (selected ? [{ ...selected, reason: t.selectedReason }] : []);
+
+  return (
+    <section className="sheetSection" id="fiche">
+      <div className="sheetShell shell">
+        <article className="knowledgeCard">
+          <header className="printHeader">
+            <div><span className="eyebrow">{t.knowledgeSheet}</span><h1>{title}</h1><p>{selected ? `${selected.formation} · ${selected.blockTitle} · ${selected.moduleTitle}` : t.generatedFromCorpus}</p></div>
+            <Image src={selected?.pulse === "Paie & Social" ? piaImages.payroll : piaImages.answer} width={140} height={140} alt="Pia" />
+          </header>
+          <div className="sheetActions"><button onClick={() => onFavorite({ kind: answer ? "answer" : "resource", code: selected?.resourceCode || title, title })}>♡ {t.addFavorite}</button><button onClick={() => window.print()}>▣ {t.print}</button></div>
+          <section className="synthesis"><span>{t.essential}</span><p className="answerText">{summary}</p></section>
+          <section>
+            <div className="sectionIntro"><span>{t.documentsUsed}</span><h2>{t.sourcesTitle}</h2><p>{t.sourcesText}</p></div>
+            <div className="sourceGrid">{resources.map((resource) => <article key={resource.resourceCode}><div className="sourceTop"><span>{resource.resourceType || t.resource}</span><code>{resource.resourceCode}</code></div><h3>{resource.title}</h3><dl><div><dt>{t.parcours}</dt><dd>{resource.formation}</dd></div><div><dt>{t.block}</dt><dd>{resource.blockCode} {resource.blockTitle}</dd></div><div><dt>{t.module}</dt><dd>{resource.moduleCode} {resource.moduleTitle}</dd></div></dl><p>{resource.reason}</p></article>)}</div>
+          </section>
+          <section className="watch"><span>{t.watchStatus}</span><h2>{t.watchTitle}</h2><p>{t.watchText}</p></section>
+        </article>
+      </div>
+    </section>
+  );
+}
+
+function Favorites({ locale, favorites, remove }: { locale: Locale; favorites: Favorite[]; remove: (code: string) => void }) {
+  const t = copy[locale];
+  return (
+    <section className="favorites shell" id="favoris">
+      <div className="sectionTitle"><div><h2>{t.favoritesTitle}</h2><p>{t.favoritesText}</p></div></div>
+      {favorites.length ? <div className="favoriteGrid">{favorites.map((favorite) => <article key={`${favorite.kind}-${favorite.code}`}><small>{favorite.kind === "answer" ? t.answer : t.resource}</small><button aria-label={t.removeFavorite} onClick={() => remove(favorite.code)}>×</button><h3>{favorite.title}</h3><code>{favorite.code}</code></article>)}</div> : <div className="emptyState"><span>♡</span><h3>{t.noFavorites}</h3><p>{t.noFavoritesText}</p></div>}
+    </section>
+  );
+}
+
+function About({ locale }: { locale: Locale }) {
+  const t = copy[locale];
+  return <section className="about shell" id="apropos"><Image src={piaImages.hr} width={150} height={150} alt="Pia" /><div><span className="eyebrow">{t.aboutOverline}</span><h2>{t.aboutTitle}</h2><p>{t.aboutText}</p></div></section>;
+}
+
+function PiaAssistant({ locale, state, inputRef }: { locale: Locale; state: SearchState; inputRef: React.RefObject<HTMLInputElement | null> }) {
+  const t = copy[locale];
+  const [open, setOpen] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const visual = piaInterfaceState[state] as PiaVisualState;
+
   return (
     <div className="piaDock">
-      {panel && <div className="piaPanel"><strong>Comment puis-je vous aider ?</strong><a href="#explorer">Explorer une ressource</a><a href="#pulses">Choisir un Pulse</a><button onClick={() => speech("play")}>▷ Lire mon message</button><div><button onClick={() => speech("pause")}>Pause</button><button onClick={() => speech("resume")}>Reprendre</button><button onClick={() => speech("stop")}>Arrêter</button></div></div>}
-      <button className="piaTrigger" onClick={() => setPanel(!panel)} aria-expanded={panel} aria-label={panel ? "Fermer l’assistance Pia" : "Ouvrir l’assistance Pia"}><span className="piaMini" aria-hidden="true" /><span><b>Pia</b><small>Compagne de recherche</small></span></button>
+      {open && <div className="piaPanel"><strong>{t.piaHelp}</strong><p>{t.piaText}</p><button onClick={() => { inputRef.current?.focus(); setOpen(false); }}>{t.askQuestion}</button><a href="#explorer">{t.exploreResource}</a></div>}
+      <button className="piaTrigger" onClick={() => setOpen(!open)} aria-expanded={open}>
+        <span className="piaMini">{failed ? <b>P</b> : <Image src={piaImages[visual]} width={64} height={64} alt="Pia" onError={() => setFailed(true)} />}</span>
+        <span><b>Pia</b><small>{t.piaRole}</small></span>
+      </button>
     </div>
   );
 }
 
-function Hero() {
-  return (
-    <section className="hero" id="accueil">
-      <div className="heroGlow" />
-      <div className="heroInner shell">
-        <div className="heroCopy">
-          <span className="overline">VOTRE CONNAISSANCE, ÉCLAIRÉE</span>
-          <h1>Votre allié pour<br /><em>apprendre</em>, comprendre<br />et avancer.</h1>
-          <p>Des connaissances fiables. Des explications claires.<br />Une veille toujours à jour. Et une bonne dose de motivation !</p>
-          <div className="heroStats"><span><b>1 839</b>ressources indexées</span><span><b>8</b>domaines d’expertise</span><span><b>100 %</b>privé & sécurisé</span></div>
-        </div>
-        <div className="heroMedallion" aria-label="Logo officiel PAÏA">
-          <i className="orbit orbitOne" /><i className="orbit orbitTwo" />
-          <div className="logoDisc"><Image src="/brand/01_PAIA_Circulaire_Logo_Principal.png" width={1080} height={1080} alt="Logo officiel PAÏA" priority /></div>
-          <span className="orbitLabel">SAVOIR · PRATIQUER · ÉVOLUER</span>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function Search({ answer, setAnswer, pulse, clearPulse }: { answer: Answer | null; setAnswer: (answer: Answer) => void; pulse: string; clearPulse: () => void }) {
-  const [query, setQuery] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
-    if (!query.trim()) return;
-    setError(""); setLoading(true);
-    try {
-      const response = await fetch("/api/search", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query, pulse }) });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "La recherche est momentanément indisponible.");
-      setAnswer(data);
-      window.setTimeout(() => document.querySelector("#fiche")?.scrollIntoView({ behavior: "smooth" }), 50);
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "La recherche est momentanément indisponible."); }
-    finally { setLoading(false); }
-  };
-  return (
-    <section className="searchArea shell" aria-label="Recherche principale">
-      <form className="searchForm" onSubmit={submit}><span aria-hidden="true">⌕</span><input value={query} onChange={(event: ChangeEvent<HTMLInputElement>) => setQuery(event.target.value)} placeholder="Posez votre question à Campus PAÏA…" aria-label="Posez votre question" /><button disabled={loading} aria-label="Rechercher">{loading ? "…" : "→"}</button></form>
-      <div className="suggestions"><span>Exemples :</span>{["DSN", "Recrutement", "Recette fonctionnelle", "Formation professionnelle"].map((item) => <button key={item} onClick={() => setQuery(item)}>{item}</button>)}</div>
-      {pulse && <div className="activeFilter">Pulse sélectionné : <b>{pulse}</b><button onClick={clearPulse}>×</button></div>}
-      {error && <p className="searchError" role="alert">{error}</p>}
-      {answer && <span className="srOnly">Une réponse est disponible dans la fiche Campus PAÏA.</span>}
-    </section>
-  );
-}
-
-function Pulses({ onSelect }: { onSelect: (pulse: string) => void }) {
-  return (
-    <section className="pulseSection shell" id="pulses">
-      <div className="sectionTitle"><div><span className="pulseBolt">ϟ</span><h2>Les Pulse</h2><p>Explorez par domaine pour affiner votre recherche.</p></div><a href="#pulses">Voir tous les domaines →</a></div>
-      <div className="pulseGrid">{pulses.map(([name, description, icon], index) => <button className={`pulseCard ${pulseStyles[index]}`} key={name} onClick={() => onSelect(name)}><span className="pulseIcon">{icon}</span><b>{name}</b><p>{description}</p><i>→</i></button>)}</div>
-    </section>
-  );
-}
-
-function Shortcuts() {
-  const items = [["◈", "Explorer les formations", "Par projet, bloc, module et ressource", "#explorer", "Accéder à l’explorateur"], ["▤", "Découvrir les énoncés", "S’entraîner et structurer son raisonnement", "#fiche", "Accéder aux énoncés"], ["★", "Vos favoris", "Retrouvez vos fiches et réponses", "#favoris", "Voir mes favoris"]];
-  return <section className="shortcuts shell" id="enonces">{items.map(([icon, title, description, href, label], index) => <article key={title}><span className={`shortcutIcon c${index}`}>{icon}</span><div><h3>{title}</h3><p>{description}</p><a href={href}>{label}　→</a></div></article>)}</section>;
-}
-
-function Explorer() {
-  const [formation, setFormation] = useState<Formation | "">("");
-  const [bloc, setBloc] = useState(""); const [module, setModule] = useState(""); const [resource, setResource] = useState("");
-  const tree = formation ? formations[formation] as Record<string, Record<string, readonly string[]>> : null;
-  const blocks = tree ? Object.keys(tree) : [];
-  const modules = tree && bloc ? Object.keys(tree[bloc] ?? {}) : [];
-  const resources = useMemo(() => tree && bloc && module ? tree[bloc]?.[module] ?? [] : [], [tree, bloc, module]);
-  const Choice = ({ title, items, onPick, back }: { title: string; items: readonly string[]; onPick: (item: string) => void; back?: () => void }) => <div className="choicePanel">{back && <button className="backButton" onClick={back}>← Étape précédente</button>}<h3>{title}</h3><div>{items.map((item) => <button key={item} onClick={() => onPick(item)}><span>▣</span>{item}<b>→</b></button>)}</div></div>;
-  return (
-    <section className="explorer shell" id="explorer">
-      <header><span className="overline">VOTRE BIBLIOTHÈQUE PRIVÉE</span><h2>Explorer les ressources</h2><p>Progressez pas à pas, de la formation jusqu’à la ressource.</p></header>
-      <div className="steps">{["Formation", "Bloc", "Module", "Ressource"].map((name, index) => <span className={(index === 0 || index === 1 && formation || index === 2 && bloc || index === 3 && module) ? "ready" : ""} key={name}><b>{index + 1}</b>{name}</span>)}</div>
-      <div className="explorerCard">
-        {!formation && <Choice title="Choisissez une formation" items={Object.keys(formations)} onPick={(item) => setFormation(item as Formation)} />}
-        {formation && !bloc && <Choice title="Choisissez un bloc" items={blocks} onPick={setBloc} back={() => setFormation("")} />}
-        {formation && bloc && !module && <Choice title="Choisissez un module" items={modules} onPick={setModule} back={() => setBloc("")} />}
-        {formation && bloc && module && !resource && <Choice title="Choisissez une ressource" items={resources} onPick={setResource} back={() => setModule("")} />}
-        {resource && <div className="resourceResult"><button className="backButton" onClick={() => setResource("")}>← Retour aux ressources</button><p>{formation}　/　{bloc}　/　{module}</p><h3>{resource}</h3><small>Référence interne · CPA-{String(resource.length).padStart(3, "0")}</small><div><button>Résumer cette ressource</button><button>Points à maîtriser</button></div></div>}
-      </div>
-    </section>
-  );
-}
-
-function KnowledgeSheet({ answer }: { answer: Answer | null }) {
-  const [favorite, setFavorite] = useState(false);
-  useEffect(() => setFavorite(localStorage.getItem("favorite-dsn") === "1"), []);
-  const text = answer?.summary || "La DSN est un flux déclaratif mensuel transmis par les employeurs à partir des données de paie. Elle permet de communiquer aux organismes sociaux les informations nécessaires à la gestion des droits et au calcul des cotisations.";
-  const toggleFavorite = () => { const next = !favorite; setFavorite(next); localStorage.setItem("favorite-dsn", next ? "1" : "0"); };
-  const listen = () => { speechSynthesis.cancel(); const utterance = new SpeechSynthesisUtterance(text); utterance.lang = "fr-FR"; speechSynthesis.speak(utterance); };
-  const contents = ["En 30 secondes", "Comprendre vraiment", "Ce que dit la formation", "Mise à jour & veille", "Cas pratique", "Le réflexe pro", "Glossaire", "Sources", "À retenir"];
-  return (
-    <section className="sheetSection" id="fiche">
-      <div className="shell"><h2>Aperçu d’une fiche Campus PAÏA</h2><div className="sheetLayout">
-        <aside className="sheetToc"><b>Sommaire</b>{contents.map((item, index) => <a className={index === 0 ? "active" : ""} href={`#part-${index}`} key={item}><span>{index === 0 ? "⊞" : "◉"}</span>{item}</a>)}<button onClick={() => window.print()}>▣　Imprimer</button></aside>
-        <article className="knowledgeCard"><div className="domainRail">PAIE & SOCIAL</div><div className="knowledgeBody">
-          <header><div><h1>{answer?.title || "DSN — Comprendre la déclaration sociale nominative"}</h1><p>De la logique déclarative au contrôle des données sociales</p></div><Image src="/brand/02_PAIA_Circulaire_Logo_Compact.png" width={124} height={124} alt="Logo officiel PAÏA" /></header>
-          <div className="sheetMeta"><span>◆　Pulse Paie & Social</span><span>◷　Lecture : 7 min</span><span>▣　Vérifié le 21/09/2026</span><button onClick={toggleFavorite}>{favorite ? "★ Favori" : "☆ Ajouter"}</button></div>
-          <div className="reference"><b>▤　Référence pédagogique</b><p>Gestionnaire de Paie · Administration de la paie<br />Module 4 — Les déclarations sociales<br />Accès Studi : retrouvez cette ressource dans votre médiathèque avec votre code interne.</p></div>
-          <section className="thirty" id="part-0"><h3>🎯　En 30 secondes</h3><p>{text}</p><small>Source recommandée : documentation officielle en vigueur.</small></section>
-          {answer?.resources && answer.resources.length > 0 && <section className="helpfulResources" aria-labelledby="helpful-resources-title"><h3 id="helpful-resources-title">Ressources qui peuvent vous aider</h3><div>{answer.resources.map((resource) => <article key={resource.resourceCode}><header><span>{resource.resourceType || "Ressource"}</span><b>{resource.title}</b></header><p><strong>{resource.formation}</strong><br />{resource.blockCode} — {resource.blockTitle}<br />{resource.moduleCode} — {resource.moduleTitle}</p><small>{resource.reason}</small></article>)}</div></section>}
-          <section id="part-1"><h3>Comprendre vraiment</h3><p>Chaque événement individuel devient une donnée structurée. La fiabilité de la déclaration dépend donc directement de la qualité des informations et des contrôles de paie.</p></section>
-          <section className="watch" id="part-3"><h3>Mise à jour & veille</h3><p>Le cours pose le cadre pédagogique. Les dates, règles et paramètres opérationnels doivent toujours être confirmés auprès d’une source officielle actuelle.</p></section>
-          <section id="part-4"><h3>Cas pratique</h3><p>Une absence saisie après la clôture peut produire une donnée incohérente. Contrôlez l’événement, sa période de rattachement et son impact avant l’envoi.</p></section>
-        </div></article>
-        <aside className="readingTools"><b>Outils de lecture</b><button onClick={listen}>🔊　Écouter la fiche</button><ThemeToggle /><button>🇫🇷　Français　⌄</button><button>🇬🇧　Traduire en anglais</button><button onClick={() => window.print()}>▣　Imprimer (PDF)</button><div className="tip"><strong>Le conseil de Pia 🌱</strong><p>« Une règle comprise aujourd’hui, c’est une hésitation de moins demain. »</p></div></aside>
-      </div></div>
-    </section>
-  );
-}
-
-function WhyPaia() {
-  return <section className="why shell" id="apropos"><h2><Image src="/brand/04_PAIA_Circulaire_Icone.png" width={48} height={48} alt="" />Pourquoi Campus PAÏA ?</h2><div><p><b>✓　Des réponses issues de vos cours</b><span>Croisées avec les sources officielles.</span></p><p><b>◎　Une veille actualisée</b><span>Réglementaire, sociale, numérique…</span></p><p><b>♧　Des explications concrètes</b><span>Avec exemples et cas pratiques.</span></p><p><b>♡　Une touche positive</b><span>Parce qu’apprendre peut être motivant !</span></p></div></section>;
-}
-
 export default function CampusApp() {
+  const [locale, setLocaleState] = useState<Locale>("fr");
   const [answer, setAnswer] = useState<Answer | null>(null);
+  const [selected, setSelected] = useState<CatalogResource | null>(null);
   const [pulse, setPulse] = useState("");
-  const selectPulse = (name: string) => { setPulse(name); document.querySelector(".searchArea")?.scrollIntoView({ behavior: "smooth", block: "center" }); };
-  return <><Header /><main><Hero /><Search answer={answer} setAnswer={setAnswer} pulse={pulse} clearPulse={() => setPulse("")} /><Pulses onSelect={selectPulse} /><Shortcuts /><WhyPaia /><Explorer /><KnowledgeSheet answer={answer} /><div id="favoris" /></main><footer><div className="shell"><Brand compact /><p>🌱 Apprendre. Comprendre. Progresser. Ensemble.</p><span>Campus PAÏA · Septembre 2026</span><Image src="/brand/03_MMPA_Circulaire_Logo.png" width={56} height={56} alt="Logo officiel MMPA" /></div></footer><PiaAssistant /></>;
+  const [state, setState] = useState<SearchState>("idle");
+  const [favorites, setFavorites] = useState<Favorite[]>([]);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("paia-locale") as Locale | null;
+    if (saved === "fr" || saved === "en") setLocaleState(saved);
+    const storedFavorites = localStorage.getItem("paia-favorites");
+    if (storedFavorites) {
+      try { setFavorites(JSON.parse(storedFavorites)); } catch { /* ignore invalid local data */ }
+    }
+  }, []);
+
+  useEffect(() => { document.documentElement.lang = locale; }, [locale]);
+
+  const setLocale = (next: Locale) => {
+    setLocaleState(next);
+    localStorage.setItem("paia-locale", next);
+  };
+
+  const saveFavorite = (favorite: Favorite) => setFavorites((current) => {
+    const next = current.some((item) => item.code === favorite.code) ? current : [favorite, ...current];
+    localStorage.setItem("paia-favorites", JSON.stringify(next));
+    return next;
+  });
+
+  const removeFavorite = (code: string) => setFavorites((current) => {
+    const next = current.filter((item) => item.code !== code);
+    localStorage.setItem("paia-favorites", JSON.stringify(next));
+    return next;
+  });
+
+  const openResource = (resource: CatalogResource) => {
+    setSelected(resource);
+    setAnswer(null);
+    setState("success");
+    setTimeout(() => document.querySelector("#fiche")?.scrollIntoView({ behavior: "smooth" }), 80);
+  };
+
+  const selectPulse = (name: string) => {
+    setPulse(name);
+    document.querySelector("#recherche")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    setTimeout(() => inputRef.current?.focus(), 300);
+  };
+
+  return (
+    <>
+      <Header locale={locale} setLocale={setLocale} />
+      <main>
+        <Hero locale={locale} />
+        <Search locale={locale} pulse={pulse} onAnswer={(value) => { setAnswer(value); setSelected(null); }} onState={setState} inputRef={inputRef} />
+        <Pulses locale={locale} onSelect={selectPulse} />
+        <Explorer locale={locale} onOpen={openResource} onFavorite={saveFavorite} />
+        <KnowledgeSheet locale={locale} answer={answer} selected={selected} onFavorite={saveFavorite} />
+        <Favorites locale={locale} favorites={favorites} remove={removeFavorite} />
+        <About locale={locale} />
+      </main>
+      <footer><div className="shell"><Brand locale={locale} /><p>{copy[locale].footer}</p><Image src="/brand/03_MMPA_Circulaire_Logo.png" width={56} height={56} alt="MMPA" /></div></footer>
+      <PiaAssistant locale={locale} state={state} inputRef={inputRef} />
+    </>
+  );
 }
