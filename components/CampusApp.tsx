@@ -196,10 +196,30 @@ function QuestionPanel({ locale, ownerKey, setOwnerKey, saveFavorite }: { locale
       key = window.prompt(t.ownerPrompt) || "";
       if (key) setOwnerKey(key);
     }
-    const response = await fetch("/api/resource-access", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ resourceCode: resource.resourceCode, ownerKey: key }) });
-    const data = await response.json();
-    if (response.ok && data.documentUrl) window.open(data.documentUrl, "_blank", "noopener,noreferrer");
-    else setError(data.error || t.sourceRestricted);
+    if (!key) {
+      setError(locale === "fr" ? "Clé d’accès propriétaire requise pour ouvrir ce document privé." : "Owner access key required to open this private document.");
+      return;
+    }
+
+    const target = window.open("about:blank", "_blank");
+    try {
+      const response = await fetch("/api/resource-access", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ resourceCode: resource.resourceCode, ownerKey: key }) });
+      const data = await response.json();
+      if (response.ok && data.documentUrl) {
+        if (target) {
+          target.opener = null;
+          target.location.href = data.documentUrl;
+        } else {
+          window.location.href = data.documentUrl;
+        }
+      } else {
+        target?.close();
+        setError(data.error || t.sourceRestricted);
+      }
+    } catch {
+      target?.close();
+      setError(locale === "fr" ? "Impossible d’ouvrir le document pour le moment." : "Unable to open the document right now.");
+    }
   };
 
   const submit = async (event: FormEvent) => {
@@ -285,10 +305,30 @@ function ResourcePicker({ locale, mode, ownerKey, setOwnerKey, saveFavorite }: {
       key = window.prompt(t.ownerPrompt) || "";
       if (key) setOwnerKey(key);
     }
-    const response = await fetch("/api/resource-access", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ resourceCode: resource.resourceCode, ownerKey: key }) });
-    const data = await response.json();
-    if (response.ok && data.documentUrl) window.open(data.documentUrl, "_blank", "noopener,noreferrer");
-    else setMessage(data.error || t.sourceRestricted);
+    if (!key) {
+      setMessage(locale === "fr" ? "Clé d’accès propriétaire requise pour ouvrir ce document privé." : "Owner access key required to open this private document.");
+      return;
+    }
+
+    const target = window.open("about:blank", "_blank");
+    try {
+      const response = await fetch("/api/resource-access", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ resourceCode: resource.resourceCode, ownerKey: key }) });
+      const data = await response.json();
+      if (response.ok && data.documentUrl) {
+        if (target) {
+          target.opener = null;
+          target.location.href = data.documentUrl;
+        } else {
+          window.location.href = data.documentUrl;
+        }
+      } else {
+        target?.close();
+        setMessage(data.error || t.sourceRestricted);
+      }
+    } catch {
+      target?.close();
+      setMessage(locale === "fr" ? "Impossible d’ouvrir le document pour le moment." : "Unable to open the document right now.");
+    }
   };
 
   const generateRevision = async (resource: CatalogResource) => {
