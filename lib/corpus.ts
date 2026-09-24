@@ -26,13 +26,12 @@ export type ResourceRecommendation = Pick<
   "resourceCode" | "formation" | "blockCode" | "blockTitle" | "moduleCode" | "moduleTitle" | "resourceType" | "title"
 > & {
   reason: string;
-  /** Compatibilité de type uniquement : ne pas renseigner dans les réponses publiques. */
   platformUrl?: string;
   hasPrivateDocument?: boolean;
 };
 
 const PROJECT_15_BLOCK_TITLES: Record<string, string> = {
-  B00: "Introduction",
+  B00: "Réussir ma formation Graduate Formateur professionnel d'adultes",
   B01: "Les fondamentaux de l'animation pédagogique",
   B02: "Concevoir et préparer la formation",
   B03: "Animer une formation et évaluer les acquis des apprenants",
@@ -42,14 +41,6 @@ const PROJECT_15_BLOCK_TITLES: Record<string, string> = {
 
 const clean = (value: unknown) => typeof value === "string" ? value.trim() : "";
 const bool = (value: unknown) => value === true || value === "true" || value === "oui" || value === "1";
-
-export function publicText(value: unknown) {
-  return clean(value)
-    .replace(/\b(?:studi|mba|bachelor|graduate)\b/gi, "")
-    .replace(/\s{2,}/g, " ")
-    .replace(/\s+([:;,])/g, "$1")
-    .trim();
-}
 
 function splitLabel(value: string, kind: "block" | "module") {
   const expression = kind === "block"
@@ -116,11 +107,11 @@ export function buildIndexDocument(resource: CorpusResource) {
   const metadata = [
     `Code ressource : ${resource.resourceCode}`,
     `Projet : ${resource.project}`,
-    `Corpus : ${publicText(resource.formation)}`,
-    `Bloc : ${resource.blockCode} — ${publicText(resource.blockTitle)}`,
-    `Module : ${resource.moduleCode} — ${publicText(resource.moduleTitle)}`,
-    `Type : ${publicText(resource.resourceType)}`,
-    `Titre : ${publicText(resource.title)}`,
+    `Formation : ${resource.formation}`,
+    `Bloc : ${resource.blockCode} — ${resource.blockTitle}`,
+    `Module : ${resource.moduleCode} — ${resource.moduleTitle}`,
+    `Type : ${resource.resourceType}`,
+    `Titre : ${resource.title}`,
     `Pulse : ${resource.pulse}`,
     `Sous-domaine : ${resource.subdomain}`,
     `Mots-clés : ${resource.keywords.join(", ")}`,
@@ -138,17 +129,19 @@ export function publicAttributes(resource: CorpusResource): Record<string, strin
   return {
     resource_code: resource.resourceCode.slice(0, 256),
     project: resource.project.slice(0, 256),
-    formation: publicText(resource.formation).slice(0, 256),
+    formation: resource.formation.slice(0, 256),
     block_code: resource.blockCode.slice(0, 256),
-    block_title: publicText(resource.blockTitle).slice(0, 256),
+    block_title: resource.blockTitle.slice(0, 256),
     module_code: resource.moduleCode.slice(0, 256),
-    module_title: publicText(resource.moduleTitle).slice(0, 256),
-    resource_type: publicText(resource.resourceType).slice(0, 256),
-    title: publicText(resource.title).slice(0, 256),
+    module_title: resource.moduleTitle.slice(0, 256),
+    resource_type: resource.resourceType.slice(0, 256),
+    title: resource.title.slice(0, 256),
     pulse: resource.pulse.slice(0, 256),
     regulatory: resource.regulatory,
     reserved: resource.reserved,
     has_source_text: Boolean(resource.extractedText),
+    platform_url: resource.platformUrl.slice(0, 2000),
     private_document_url: resource.privateDocumentUrl.slice(0, 2000),
+    source_url: resource.sourceUrl.slice(0, 2000),
   };
 }
