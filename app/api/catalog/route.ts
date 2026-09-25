@@ -37,6 +37,7 @@ type CatalogResource = {
   resourceType: string;
   title: string;
   pulse: string;
+  platformUrl: string;
   hasPrivateDocument: boolean;
   hasSourceText: boolean;
 };
@@ -64,6 +65,7 @@ function neutralBlock(code: string, title: unknown) {
 
 function snapshotResource(item: SnapshotResource): CatalogResource | null {
   if (!item.resourceCode || !item.title || item.reserved || item.resourceType.toUpperCase() === "EMPTY") return null;
+  const links = getResourceLinks(item.resourceCode);
   return {
     resourceCode: item.resourceCode,
     formation: corpusName(item.project, item.formation),
@@ -74,7 +76,8 @@ function snapshotResource(item: SnapshotResource): CatalogResource | null {
     resourceType: publicText(item.resourceType) || "Ressource",
     title: publicText(item.title),
     pulse: item.pulse,
-    hasPrivateDocument: Boolean(item.privateDocumentUrl || getResourceLinks(item.resourceCode).drive),
+    platformUrl: item.platformUrl || links.platform || "",
+    hasPrivateDocument: Boolean(item.privateDocumentUrl || links.drive),
     hasSourceText: false,
   };
 }
@@ -96,6 +99,7 @@ function qdrantResource(payload: QdrantPayload): CatalogResource | null {
     resourceType: resourceType || "Ressource",
     title,
     pulse: text(payload.pulse),
+    platformUrl: text(payload.platform_url) || links.platform || "",
     hasPrivateDocument: Boolean(text(payload.private_document_url) || links.drive),
     hasSourceText: payload.has_source_text === true,
   };
@@ -137,7 +141,7 @@ export async function GET() {
             limit: 256,
             with_payload: [
               "resource_code", "project", "formation", "block_code", "block_title", "module_code", "module_title",
-              "resource_type", "title", "pulse", "reserved", "has_source_text", "private_document_url"
+              "resource_type", "title", "pulse", "reserved", "has_source_text", "platform_url", "private_document_url"
             ],
             with_vector: false,
             ...(offset !== undefined && offset !== null ? { offset } : {}),
