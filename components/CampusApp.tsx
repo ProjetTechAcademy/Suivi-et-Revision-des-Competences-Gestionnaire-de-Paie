@@ -176,51 +176,19 @@ function RichText({ text }: { text: string }) {
   return <div className="richText">{nodes}</div>;
 }
 
-function CompactSources({ locale, resources, openDocument }: { locale: Locale; resources: ResourceRecommendation[]; openDocument: (resource: ResourceRecommendation) => void }) {
+function CompactSources({ locale, resources }: { locale: Locale; resources: ResourceRecommendation[] }) {
   const t = copy[locale];
   if (!resources.length) return null;
-  return <section className="compactSources"><h3>📚 {t.resourcesUsed}</h3><ul>{resources.map((resource) => <li key={resource.resourceCode}><code>{resource.resourceCode}</code><span>{resource.title}</span><span className="sourceActions">{resource.hasPrivateDocument && <button onClick={() => openDocument(resource)}>{t.openDocument}</button>}</span></li>)}</ul></section>;
+  return <section className="compactSources"><h3>📚 {t.resourcesUsed}</h3><ul>{resources.map((resource) => <li key={resource.resourceCode}><code>{resource.resourceCode}</code><span>{resource.title}</span><span className="sourceActions">{resource.platformUrl && <a href={resource.platformUrl} target="_blank" rel="noreferrer">{locale === "fr" ? "Lien plateforme" : "Platform link"}</a>}</span></li>)}</ul></section>;
 }
 
-function QuestionPanel({ locale, ownerKey, setOwnerKey, saveFavorite }: { locale: Locale; ownerKey: string; setOwnerKey: (key: string) => void; saveFavorite: (favorite: Favorite) => void }) {
+function QuestionPanel({ locale, saveFavorite }: { locale: Locale; saveFavorite: (favorite: Favorite) => void }) {
   const t = copy[locale];
   const [query, setQuery] = useState("");
   const [pulse, setPulse] = useState("");
   const [answer, setAnswer] = useState<Answer | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
-  const openDocument = async (resource: ResourceRecommendation) => {
-    let key = ownerKey;
-    if (!key) {
-      key = window.prompt(t.ownerPrompt) || "";
-      if (key) setOwnerKey(key);
-    }
-    if (!key) {
-      setError(locale === "fr" ? "Clé d’accès propriétaire requise pour ouvrir ce document privé." : "Owner access key required to open this private document.");
-      return;
-    }
-
-    const target = window.open("about:blank", "_blank");
-    try {
-      const response = await fetch("/api/resource-access", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ resourceCode: resource.resourceCode, ownerKey: key }) });
-      const data = await response.json();
-      if (response.ok && data.documentUrl) {
-        if (target) {
-          target.opener = null;
-          target.location.href = data.documentUrl;
-        } else {
-          window.location.href = data.documentUrl;
-        }
-      } else {
-        target?.close();
-        setError(data.error || t.sourceRestricted);
-      }
-    } catch {
-      target?.close();
-      setError(locale === "fr" ? "Impossible d’ouvrir le document pour le moment." : "Unable to open the document right now.");
-    }
-  };
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -239,11 +207,11 @@ function QuestionPanel({ locale, ownerKey, setOwnerKey, saveFavorite }: { locale
     <form className="questionForm" onSubmit={submit}><span>⌕</span><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t.searchPlaceholder} /><button disabled={loading}>{loading ? "…" : t.searchButton}</button></form>
     <div className="pulseChips"><small>{t.pulse}</small>{pulseNames.map((name) => <button key={name} className={pulse === name ? "active" : ""} onClick={() => setPulse(pulse === name ? "" : name)}>{name}</button>)}</div>
     {error && <p className="notice error">{error}</p>}
-    {answer && <article className="resultSheet"><header><span className="eyebrow">{t.answer}</span><h2>{answer.title}</h2><div><button onClick={() => saveFavorite({ kind: "answer", code: answer.title, title: answer.title })}>♡ {t.favoriteAdd}</button><button onClick={() => window.print()}>▣ {t.print}</button></div></header><RichText text={answer.summary} /><CompactSources locale={locale} resources={answer.resources ?? []} openDocument={openDocument} /></article>}
+    {answer && <article className="resultSheet"><header><span className="eyebrow">{t.answer}</span><h2>{answer.title}</h2><div><button onClick={() => saveFavorite({ kind: "answer", code: answer.title, title: answer.title })}>♡ {t.favoriteAdd}</button><button onClick={() => window.print()}>▣ {t.print}</button></div></header><RichText text={answer.summary} /><CompactSources locale={locale} resources={answer.resources ?? []} /></article>}
   </section>;
 }
 
-function ResourcePicker({ locale, mode, ownerKey, setOwnerKey, saveFavorite }: { locale: Locale; mode: "documents" | "revision"; ownerKey: string; setOwnerKey: (key: string) => void; saveFavorite: (favorite: Favorite) => void }) {
+function ResourcePicker({ locale, mode, saveFavorite }: { locale: Locale; mode: "documents" | "revision"; saveFavorite: (favorite: Favorite) => void }) {
   const t = copy[locale];
   const [resources, setResources] = useState<CatalogResource[]>([]);
   const [loading, setLoading] = useState(true);
@@ -299,38 +267,6 @@ function ResourcePicker({ locale, mode, ownerKey, setOwnerKey, saveFavorite }: {
     [resources, parcours, block, module]
   );
 
-  const openDocument = async (resource: CatalogResource | ResourceRecommendation) => {
-    let key = ownerKey;
-    if (!key) {
-      key = window.prompt(t.ownerPrompt) || "";
-      if (key) setOwnerKey(key);
-    }
-    if (!key) {
-      setMessage(locale === "fr" ? "Clé d’accès propriétaire requise pour ouvrir ce document privé." : "Owner access key required to open this private document.");
-      return;
-    }
-
-    const target = window.open("about:blank", "_blank");
-    try {
-      const response = await fetch("/api/resource-access", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ resourceCode: resource.resourceCode, ownerKey: key }) });
-      const data = await response.json();
-      if (response.ok && data.documentUrl) {
-        if (target) {
-          target.opener = null;
-          target.location.href = data.documentUrl;
-        } else {
-          window.location.href = data.documentUrl;
-        }
-      } else {
-        target?.close();
-        setMessage(data.error || t.sourceRestricted);
-      }
-    } catch {
-      target?.close();
-      setMessage(locale === "fr" ? "Impossible d’ouvrir le document pour le moment." : "Unable to open the document right now.");
-    }
-  };
-
   const generateRevision = async (resource: CatalogResource) => {
     setGenerating(resource.resourceCode); setMessage(""); setRevision(null);
     try {
@@ -382,8 +318,8 @@ function ResourcePicker({ locale, mode, ownerKey, setOwnerKey, saveFavorite }: {
       </div>
       {module && <div className="resourceList">{visible.length ? visible.map((resource) => <div className="resourceRow" key={resource.resourceCode}><span className="resourceType">{resource.resourceType}</span><code>{resource.resourceCode}</code><strong>{resource.title}</strong><span className="rowActions">
         <button className="ghost" onClick={() => saveFavorite({ kind: "resource", code: resource.resourceCode, title: resource.title })}>♡</button>
-        {mode === "documents" && resource.hasPrivateDocument && <button onClick={() => openDocument(resource)}>{locale === "fr" ? "Ouvrir" : "Open"}</button>}
-        {mode === "documents" && !resource.hasPrivateDocument && <small>{t.sourceNotLinked}</small>}
+        {mode === "documents" && resource.platformUrl && <a href={resource.platformUrl} target="_blank" rel="noreferrer">{locale === "fr" ? "Lien plateforme" : "Platform link"}</a>}
+        {mode === "documents" && !resource.platformUrl && <small>{locale === "fr" ? "Lien plateforme indisponible" : "Platform link unavailable"}</small>}
         <button className="primary" onClick={() => generateRevision(resource)} disabled={generating === resource.resourceCode}>{generating === resource.resourceCode ? "…" : (locale === "fr" ? "Fiche PAÏA" : "PAÏA Sheet")}</button>
       </span></div>) : <p className="notice">{t.noResources}</p>}</div>}
     </>}
@@ -412,7 +348,6 @@ export default function CampusApp() {
   const [locale, setLocaleState] = useState<Locale>("fr");
   const [mode, setMode] = useState<Mode>("question");
   const [favorites, setFavorites] = useState<Favorite[]>([]);
-  const [ownerKey, setOwnerKeyState] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -420,13 +355,11 @@ export default function CampusApp() {
     if (savedLocale === "fr" || savedLocale === "en") setLocaleState(savedLocale);
     const stored = localStorage.getItem("paia-favorites");
     if (stored) try { setFavorites(JSON.parse(stored)); } catch { /* ignore */ }
-    setOwnerKeyState(sessionStorage.getItem("paia-owner-key") || "");
   }, []);
 
   useEffect(() => { document.documentElement.lang = locale; }, [locale]);
 
   const setLocale = (next: Locale) => { setLocaleState(next); localStorage.setItem("paia-locale", next); };
-  const setOwnerKey = (key: string) => { setOwnerKeyState(key); if (key) sessionStorage.setItem("paia-owner-key", key); };
   const saveFavorite = (favorite: Favorite) => setFavorites((current) => {
     const next = current.some((item) => item.code === favorite.code) ? current : [favorite, ...current];
     localStorage.setItem("paia-favorites", JSON.stringify(next));
@@ -444,9 +377,9 @@ export default function CampusApp() {
       {mode === "question" && <Hero locale={locale} />}
       <WorkspaceChooser locale={locale} mode={mode} setMode={setMode} />
       <div className="workspace shell" id="workspace">
-        {mode === "question" && <QuestionPanel locale={locale} ownerKey={ownerKey} setOwnerKey={setOwnerKey} saveFavorite={saveFavorite} />}
-        {mode === "documents" && <ResourcePicker locale={locale} mode="documents" ownerKey={ownerKey} setOwnerKey={setOwnerKey} saveFavorite={saveFavorite} />}
-        {mode === "revision" && <ResourcePicker locale={locale} mode="revision" ownerKey={ownerKey} setOwnerKey={setOwnerKey} saveFavorite={saveFavorite} />}
+        {mode === "question" && <QuestionPanel locale={locale} saveFavorite={saveFavorite} />}
+        {mode === "documents" && <ResourcePicker locale={locale} mode="documents" saveFavorite={saveFavorite} />}
+        {mode === "revision" && <ResourcePicker locale={locale} mode="revision" saveFavorite={saveFavorite} />}
         {mode === "favorites" && <FavoritesPanel locale={locale} favorites={favorites} remove={removeFavorite} />}
         {mode === "about" && <AboutPanel locale={locale} />}
       </div>
