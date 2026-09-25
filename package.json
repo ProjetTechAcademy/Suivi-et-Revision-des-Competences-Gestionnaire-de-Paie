@@ -20,5 +20,11 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "typescript": "^5.7.0"
+  },
+  "optionalDependencies": {
+    "@napi-rs/canvas": "0.1.89"
+  },
+  "engines": {
+    "node": ">=22.3.0"
   }
 }
