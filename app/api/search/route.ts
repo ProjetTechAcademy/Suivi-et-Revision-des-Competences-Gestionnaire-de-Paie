@@ -14,7 +14,7 @@ type SearchBody = { query: string; pulse?: string; resourceCode?: string; locale
 type SnapshotResource = {
   resourceCode: string; project: string; formation: string; blockCode: string; blockTitle: string;
   moduleCode: string; moduleTitle: string; resourceType: string; title: string; pulse: string;
-  keywords: string[]; privateDocumentUrl: string; sourceUrl: string; reserved: boolean;
+  keywords: string[]; platformUrl: string; privateDocumentUrl: string; sourceUrl: string; reserved: boolean;
 };
 
 const snapshot = snapshotJson as SnapshotResource[];
@@ -82,6 +82,7 @@ function recommendations(hits: Awaited<ReturnType<typeof searchQdrant>>, locale:
       resourceType: publicText(payload.resource_type),
       title: publicText(payload.title),
       reason: locale === "en" ? "Related resource found in the corpus." : "Ressource associée trouvée dans le corpus.",
+      platformUrl: text(payload.platform_url) || links.platform || "",
       hasPrivateDocument: Boolean(text(payload.private_document_url) || links.drive),
     }];
   }).slice(0, 8);
@@ -130,6 +131,7 @@ function snapshotRecommendation(item: SnapshotResource, locale: Locale): Resourc
     resourceType: publicText(item.resourceType),
     title: publicText(item.title),
     reason: locale === "en" ? "Related resource found in the corpus." : "Ressource associée trouvée dans le corpus.",
+    platformUrl: item.platformUrl || getResourceLinks(item.resourceCode).platform || "",
     hasPrivateDocument: Boolean(item.privateDocumentUrl || getResourceLinks(item.resourceCode).drive),
   };
 }
