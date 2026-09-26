@@ -237,6 +237,27 @@ export async function analyzeSourceSliceWithGroq(input: {
   return result;
 }
 
+export async function mergeSliceAnalysesWithGroq(input: {
+  resourceCode: string;
+  groupIndex: number;
+  analysisText: string;
+  locale?: Locale;
+}) {
+  const french = (input.locale ?? "fr") === "fr";
+  const system = french
+    ? "Fusionne plusieurs analyses de tranches d'un même document. Supprime uniquement les doublons stricts. Préserve les concepts, règles, étapes, conditions, exceptions, chiffres, formules, exemples, nuances et jargon utiles. Ne consulte pas le web, ne corrige rien et n'invente rien. Réponds en Markdown dense et structuré."
+    : "Merge several slice analyses from one document. Remove only strict duplicates. Preserve supported concepts, rules, steps, conditions, exceptions, figures, formulas, examples and nuances. Do not browse or invent facts.";
+
+  const result = await chat(
+    system,
+    `Ressource : ${input.resourceCode}\nGroupe : ${input.groupIndex}\n\n${input.analysisText}`,
+    { maxCompletionTokens: 700, temperature: 0.03 }
+  );
+
+  if (!result.trim()) throw new Error("EMPTY_GROUP_ANALYSIS");
+  return result;
+}
+
 export async function resourceQuestionWithGroq(input: {
   resourceCode: string;
   title: string;
