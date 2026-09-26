@@ -353,6 +353,10 @@ function ResourcePicker({ locale, mode, saveFavorite }: { locale: Locale; mode: 
           label = locale === "fr"
             ? `🧩 Consolidation : ${done}/${total}`
             : `🧩 Consolidation: ${done}/${total}`;
+        } else if (prepare.stage === "parts") {
+          label = locale === "fr"
+            ? `✍️ Rédaction de la fiche : ${done}/${total}`
+            : `✍️ Writing the sheet: ${done}/${total}`;
         } else if (prepare.stage === "ready") {
           label = locale === "fr" ? "✅ Préparation terminée" : "✅ Preparation complete";
         }
