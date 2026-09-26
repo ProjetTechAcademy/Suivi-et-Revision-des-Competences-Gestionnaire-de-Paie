@@ -186,6 +186,7 @@ export async function upsertResourceTextCache(input: {
   sourceHash?: string | null;
 }) {
   await ensureResourceTextCache();
+  const safeFullText = (input.fullText || "").replace(/\u0000/g, "");
   await getPool().query(
     `
       INSERT INTO campus_paia.resource_text_cache (
@@ -202,8 +203,8 @@ export async function upsertResourceTextCache(input: {
     `,
     [
       input.resourceCode,
-      input.fullText,
-      input.textStatus || (input.fullText ? "text_extracted" : "metadata_only"),
+      safeFullText,
+      input.textStatus || (safeFullText ? "text_extracted" : "metadata_only"),
       input.sourceKind || "unknown",
       input.chunkCount || 0,
       input.sourceHash || null,
