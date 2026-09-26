@@ -3,6 +3,7 @@ import {
   failSliceAnalysis,
   fetchNextPendingSlice,
   markSliceAnalysisProcessing,
+  resetEmptySliceAnalyses,
   resourceSliceAnalysisStatus,
   saveSliceAnalysis,
 } from "@/lib/db";
@@ -14,11 +15,17 @@ export const maxDuration = 120;
 const RESOURCE_CODE = "CD0_B1_M03_F001";
 
 export async function GET() {
+  await resetEmptySliceAnalyses(RESOURCE_CODE);
   const before = await resourceSliceAnalysisStatus(RESOURCE_CODE);
   const slice = await fetchNextPendingSlice(RESOURCE_CODE);
 
   if (!slice) {
-    return NextResponse.json({ resourceCode: RESOURCE_CODE, before, after: before, complete: before.total > 0 && before.done === before.total });
+    return NextResponse.json({
+      resourceCode: RESOURCE_CODE,
+      before,
+      after: before,
+      complete: before.total > 0 && before.done === before.total,
+    });
   }
 
   await markSliceAnalysisProcessing(RESOURCE_CODE, slice.slice_index);
@@ -31,6 +38,7 @@ export async function GET() {
       sliceText: slice.slice_text,
       locale: "fr",
     });
+
     await saveSliceAnalysis(RESOURCE_CODE, slice.slice_index, analysis);
     const after = await resourceSliceAnalysisStatus(RESOURCE_CODE);
     return NextResponse.json({
@@ -44,6 +52,11 @@ export async function GET() {
     const message = error instanceof Error ? error.message : "Erreur inconnue";
     await failSliceAnalysis(RESOURCE_CODE, slice.slice_index, message);
     const after = await resourceSliceAnalysisStatus(RESOURCE_CODE);
-    return NextResponse.json({ resourceCode: RESOURCE_CODE, processedSlice: slice.slice_index, error: message, after }, { status: 502 });
+    return NextResponse.json({
+      resourceCode: RESOURCE_CODE,
+      processedSlice: slice.slice_index,
+      error: message,
+      after,
+    }, { status: 502 });
   }
 }
