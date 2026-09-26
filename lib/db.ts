@@ -3,7 +3,7 @@ import type { CorpusResource } from "@/lib/corpus";
 
 type GlobalDb = typeof globalThis & { __campusPaiaPool?: Pool };
 
-function getPool() {
+export function getPool() {
   const connectionString = process.env.DATABASE_URL || "";
   if (!connectionString) throw new Error("DATABASE_URL_NOT_CONFIGURED");
 
@@ -139,4 +139,142 @@ export async function upsertCorpusResource(
       resource.updatedAt || null,
     ],
   );
+}
+
+
+export type ResourceTextCacheRow = {
+  resource_code: string;
+  full_text: string;
+  text_status: string;
+  source_kind: string;
+  chunk_count: number;
+  source_hash: string | null;
+  updated_at: string;
+};
+
+export async function ensureResourceTextCache() {
+  await getPool().query(`
+    CREATE TABLE IF NOT EXISTS campus_paia.resource_text_cache (
+      resource_code text PRIMARY KEY REFERENCES campus_paia.resources(resource_code) ON DELETE CASCADE,
+      full_text text NOT NULL DEFAULT '',
+      text_status text NOT NULL DEFAULT 'metadata_only',
+      source_kind text NOT NULL DEFAULT 'unknown',
+      chunk_count integer NOT NULL DEFAULT 0,
+      source_hash text,
+      updated_at timestamptz NOT NULL DEFAULT now()
+    )
+  `);
+  await getPool().query(`
+    CREATE INDEX IF NOT EXISTS idx_resource_text_cache_status
+    ON campus_paia.resource_text_cache(text_status)
+  `);
+}
+
+export async function upsertResourceTextCache(input: {
+  resourceCode: string;
+  fullText: string;
+  textStatus?: string;
+  sourceKind?: string;
+  chunkCount?: number;
+  sourceHash?: string | null;
+}) {
+  await ensureResourceTextCache();
+  await getPool().query(
+    `
+      INSERT INTO campus_paia.resource_text_cache (
+        resource_code, full_text, text_status, source_kind, chunk_count, source_hash, updated_at
+      )
+      VALUES ($1,$2,$3,$4,$5,$6,now())
+      ON CONFLICT (resource_code) DO UPDATE SET
+        full_text = EXCLUDED.full_text,
+        text_status = EXCLUDED.text_status,
+        source_kind = EXCLUDED.source_kind,
+        chunk_count = EXCLUDED.chunk_count,
+        source_hash = EXCLUDED.source_hash,
+        updated_at = now()
+    `,
+    [
+      input.resourceCode,
+      input.fullText,
+      input.textStatus || (input.fullText ? "text_extracted" : "metadata_only"),
+      input.sourceKind || "unknown",
+      input.chunkCount || 0,
+      input.sourceHash || null,
+    ],
+  );
+}
+
+export async function fetchResourceTextCache(resourceCode: string) {
+  await ensureResourceTextCache();
+  const result = await getPool().query<ResourceTextCacheRow>(
+    `
+      SELECT resource_code, full_text, text_status, source_kind, chunk_count, source_hash, updated_at
+      FROM campus_paia.resource_text_cache
+      WHERE resource_code = $1
+      LIMIT 1
+    `,
+    [resourceCode],
+  );
+  return result.rows[0] ?? null;
+}
+
+export async function fetchResourceByCode(resourceCode: string) {
+  const result = await getPool().query(
+    `
+      SELECT
+        resource_code,
+        project_number,
+        corpus_name,
+        formation_name,
+        block_code,
+        block_title,
+        module_code,
+        module_title,
+        resource_type,
+        title,
+        pulse,
+        subdomain,
+        keywords,
+        regulatory,
+        platform_url,
+        private_document_url,
+        source_url,
+        source_status,
+        qdrant_status
+      FROM campus_paia.resources
+      WHERE resource_code = $1
+        AND reserved = false
+      LIMIT 1
+    `,
+    [resourceCode],
+  );
+  return result.rows[0] ?? null;
+}
+
+export async function listIndexedResourceCodes(limit: number, offset: number) {
+  const result = await getPool().query<{ resource_code: string }>(
+    `
+      SELECT resource_code
+      FROM campus_paia.resources
+      WHERE reserved = false
+        AND qdrant_status = 'indexed_text'
+      ORDER BY resource_code
+      LIMIT $1 OFFSET $2
+    `,
+    [limit, offset],
+  );
+  return result.rows.map((row) => row.resource_code);
+}
+
+export async function resourceTextCacheStats() {
+  await ensureResourceTextCache();
+  const result = await getPool().query<{ text_status: string; count: number }>(
+    `
+      SELECT text_status, count(*)::int AS count
+      FROM campus_paia.resource_text_cache
+      GROUP BY text_status
+      ORDER BY text_status
+    `
+  );
+  return result.rows;
 }
