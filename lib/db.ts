@@ -285,3 +285,43 @@ export async function resourceTextCacheStats() {
   );
   return result.rows;
 }
+
+
+export async function listMissingResourceTextCacheCodes(limit = 40) {
+  await ensureResourceTextCache();
+  const result = await getPool().query<{ resource_code: string }>(
+    `
+      SELECT r.resource_code
+      FROM campus_paia.resources r
+      LEFT JOIN campus_paia.resource_text_cache c
+        ON c.resource_code = r.resource_code
+       AND c.text_status = 'text_extracted'
+       AND length(c.full_text) > 0
+      WHERE r.reserved = false
+        AND r.qdrant_status = 'indexed_text'
+        AND c.resource_code IS NULL
+      ORDER BY r.resource_code
+      LIMIT $1
+    `,
+    [limit],
+  );
+  return result.rows.map((row) => row.resource_code);
+}
+
+export async function countMissingResourceTextCache() {
+  await ensureResourceTextCache();
+  const result = await getPool().query<{ count: number }>(
+    `
+      SELECT count(*)::int AS count
+      FROM campus_paia.resources r
+      LEFT JOIN campus_paia.resource_text_cache c
+        ON c.resource_code = r.resource_code
+       AND c.text_status = 'text_extracted'
+       AND length(c.full_text) > 0
+      WHERE r.reserved = false
+        AND r.qdrant_status = 'indexed_text'
+        AND c.resource_code IS NULL
+    `
+  );
+  return result.rows[0]?.count ?? 0;
+}
