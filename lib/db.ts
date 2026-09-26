@@ -218,11 +218,11 @@ export async function rebuildResourceTextSlices(resourceCode: string) {
           source.full_text,
           source.total_chars,
           gs AS slice_index,
-          1 + ((gs - 1) * 9500) AS char_start
+          1 + ((gs - 1) * 4000) AS char_start
         FROM source
         CROSS JOIN LATERAL generate_series(
           1,
-          GREATEST(1, CEIL((source.total_chars - 500)::numeric / 9500)::int)
+          GREATEST(1, CEIL((source.total_chars - 500)::numeric / 4000)::int)
         ) AS gs
       ),
       inserted AS (
@@ -233,9 +233,9 @@ export async function rebuildResourceTextSlices(resourceCode: string) {
           resource_code,
           slice_index,
           char_start,
-          LEAST(total_chars, char_start + 9999),
-          length(substring(full_text FROM char_start FOR 10000)),
-          substring(full_text FROM char_start FOR 10000)
+          LEAST(total_chars, char_start + 4499),
+          length(substring(full_text FROM char_start FOR 4500)),
+          substring(full_text FROM char_start FOR 4500)
         FROM starts
         RETURNING 1
       )
@@ -264,11 +264,11 @@ export async function rebuildAllResourceTextSlices() {
         source.full_text,
         source.total_chars,
         gs AS slice_index,
-        1 + ((gs - 1) * 9500) AS char_start
+        1 + ((gs - 1) * 4000) AS char_start
       FROM source
       CROSS JOIN LATERAL generate_series(
         1,
-        GREATEST(1, CEIL((source.total_chars - 500)::numeric / 9500)::int)
+        GREATEST(1, CEIL((source.total_chars - 500)::numeric / 4000)::int)
       ) AS gs
     ),
     inserted AS (
@@ -279,9 +279,9 @@ export async function rebuildAllResourceTextSlices() {
         resource_code,
         slice_index,
         char_start,
-        LEAST(total_chars, char_start + 9999),
-        length(substring(full_text FROM char_start FOR 10000)),
-        substring(full_text FROM char_start FOR 10000)
+        LEAST(total_chars, char_start + 4499),
+        length(substring(full_text FROM char_start FOR 4500)),
+        substring(full_text FROM char_start FOR 4500)
       FROM starts
       RETURNING resource_code
     )
