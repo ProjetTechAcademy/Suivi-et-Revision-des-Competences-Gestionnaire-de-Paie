@@ -68,7 +68,8 @@ function neutralBlock(code: string, title: unknown) {
 }
 
 function snapshotResource(item: SnapshotResource): CatalogResource | null {
-  if (!item.resourceCode || !item.title || item.reserved || item.resourceType.toUpperCase() === "EMPTY") return null;
+  const falseReservedCorrection = item.resourceCode === "C360_B00_M10_L005";
+  if (!item.resourceCode || !item.title || (item.reserved && !falseReservedCorrection) || item.resourceType.toUpperCase() === "EMPTY") return null;
   const links = getResourceLinks(item.resourceCode);
   return {
     resourceCode: item.resourceCode,
