@@ -231,11 +231,7 @@ export async function analyzeSourceSliceWithGroq(input: {
   return chat(
     system,
     `Ressource : ${input.resourceCode}\nTranche : ${input.sliceIndex}/${input.totalSlices}\n\n${input.sliceText}`,
-    { maxCompletionTokens: 900, temperature: 0.03 }
-  );
-}
-
-export async function resourceQuestionWithGroq(input: {
+    { maxCompletionTokens: 900, temperature: 0.03 }\n  );\n  if (!result.trim()) throw new Error("EMPTY_SLICE_ANALYSIS");\n  return result;\n}\n\nexport async function resourceQuestionWithGroq(input: {
   resourceCode: string;
   title: string;
   question: string;
