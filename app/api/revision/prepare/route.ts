@@ -77,6 +77,7 @@ export async function POST(request: NextRequest) {
           : "Le moteur d’analyse est momentanément saturé. La tranche sera reprise automatiquement.",
         code: "SLICE_ANALYSIS_RETRY",
         stage: "slices",
+        waitMs: 35000,
       }, { status: 503 });
     }
 
@@ -85,7 +86,7 @@ export async function POST(request: NextRequest) {
       stage: "slices",
       ready: false,
       progress: slices,
-      waitMs: slices.done === slices.total ? 0 : 32000,
+      waitMs: 32000,
     });
   }
 
@@ -116,6 +117,7 @@ export async function POST(request: NextRequest) {
           : "Le moteur de consolidation est momentanément saturé. Le groupe sera repris automatiquement.",
         code: "GROUP_ANALYSIS_RETRY",
         stage: "groups",
+        waitMs: 35000,
       }, { status: 503 });
     }
 
@@ -124,7 +126,7 @@ export async function POST(request: NextRequest) {
       stage: "groups",
       ready: groups.done === groups.total,
       progress: groups,
-      waitMs: groups.done === groups.total ? 32000 : 32000,
+      waitMs: groups.done === groups.total ? 61000 : 35000,
     });
   }
 
