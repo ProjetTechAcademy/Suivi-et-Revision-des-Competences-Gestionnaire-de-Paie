@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import {
   countMissingResourceTextCache,
   listMissingResourceTextCacheCodes,
@@ -37,15 +37,8 @@ function mergeOverlappingChunks(parts: string[]) {
     .trim();
 }
 
-export async function POST(request: NextRequest) {
-  const expected = process.env.CAMPUS_SYNC_SECRET || "";
-  const supplied = request.headers.get("x-campus-sync-secret") || "";
-  if (!expected || supplied !== expected) {
-    return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
-  }
-
-  const body = await request.json().catch(() => ({})) as { limit?: number };
-  const limit = Math.max(1, Math.min(Number(body.limit) || 40, 80));
+export async function GET() {
+  const limit = 80;
   const codes = await listMissingResourceTextCacheCodes(limit);
   const results: Array<{ code: string; ok: boolean; chars?: number; chunks?: number; error?: string }> = [];
 
