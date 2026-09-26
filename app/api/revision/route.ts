@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
 
     let preparedContext = "";
     try {
-      const prepared = await prepareRevisionGroups(resourceCode, 10);
+      const prepared = await prepareRevisionGroups(resourceCode, 5);
       if (prepared.ready) {
         const groupStatus = await revisionGroupStatus(resourceCode);
         if (groupStatus.total > 0 && groupStatus.done === groupStatus.total) {
