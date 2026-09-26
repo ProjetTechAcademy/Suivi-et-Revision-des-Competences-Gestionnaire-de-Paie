@@ -228,10 +228,16 @@ export async function analyzeSourceSliceWithGroq(input: {
   const system = french
     ? "Analyse uniquement cette tranche. Extrais fidèlement concepts, règles, étapes, conditions, exceptions, chiffres, formules, exemples et jargon présents. Ne produis pas la fiche finale, ne consulte pas le web et n'invente rien. Si une idée est coupée par la frontière de tranche, indique [FRONTIÈRE DE TRANCHE]. Réponds en Markdown dense."
     : "Analyze only this slice. Extract supported concepts, rules, steps, conditions, exceptions, figures, formulas, examples and jargon. Do not produce the final sheet, browse, or invent facts.";
-  return chat(
+  const result = await chat(
     system,
     `Ressource : ${input.resourceCode}\nTranche : ${input.sliceIndex}/${input.totalSlices}\n\n${input.sliceText}`,
-    { maxCompletionTokens: 900, temperature: 0.03 }\n  );\n  if (!result.trim()) throw new Error("EMPTY_SLICE_ANALYSIS");\n  return result;\n}\n\nexport async function resourceQuestionWithGroq(input: {
+    { maxCompletionTokens: 900, temperature: 0.03 }
+  );
+  if (!result.trim()) throw new Error("EMPTY_SLICE_ANALYSIS");
+  return result;
+}
+
+export async function resourceQuestionWithGroq(input: {
   resourceCode: string;
   title: string;
   question: string;
