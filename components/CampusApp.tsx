@@ -6,6 +6,8 @@ import type { ResourceRecommendation } from "@/lib/corpus";
 import { copy, type Locale } from "@/lib/i18n";
 import { piaImages } from "@/lib/pia";
 import { ThemeToggle } from "./ThemeToggle";
+import MindMapPanel, { type MindMapData } from "./MindMapPanel";
+import ResourceQuestionModal from "./ResourceQuestionModal";
 
 type Mode = "question" | "documents" | "revision" | "favorites" | "about";
 type Answer = { title: string; summary: string; resources?: ResourceRecommendation[]; sourceTextAvailable?: boolean };
@@ -222,6 +224,9 @@ function ResourcePicker({ locale, mode, saveFavorite }: { locale: Locale; mode: 
   const [revision, setRevision] = useState<Revision | null>(null);
   const [generating, setGenerating] = useState("");
   const [openPicker, setOpenPicker] = useState<PickerName | null>(null);
+  const [mindMap, setMindMap] = useState<MindMapData | null>(null);
+  const [mindMapLoading, setMindMapLoading] = useState("");
+  const [questionResource, setQuestionResource] = useState<CatalogResource | null>(null);
 
   useEffect(() => {
     fetch("/api/catalog").then((r) => r.json()).then((data) => setResources(data.resources ?? [])).catch(() => setMessage("Catalogue indisponible.")).finally(() => setLoading(false));
@@ -279,6 +284,25 @@ function ResourcePicker({ locale, mode, saveFavorite }: { locale: Locale; mode: 
     finally { setGenerating(""); }
   };
 
+  const generateMindMap = async (resource: CatalogResource) => {
+    setMindMapLoading(resource.resourceCode);
+    setMessage("");
+    try {
+      const response = await fetch("/api/mindmap", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ resourceCode: resource.resourceCode, locale }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Erreur");
+      setMindMap(data);
+    } catch (reason) {
+      setMessage(reason instanceof Error ? reason.message : "Erreur");
+    } finally {
+      setMindMapLoading("");
+    }
+  };
+
   return <section className="toolPanel">
     <header className="panelIntro"><span className="eyebrow">{mode === "documents" ? "BIBLIOTHÈQUE" : "FICHE PAÏA"}</span><h2>{t.explorerTitle}</h2><p>{t.explorerText}</p></header>
     {loading ? <p className="notice">{t.loading}</p> : <>
@@ -317,14 +341,17 @@ function ResourcePicker({ locale, mode, saveFavorite }: { locale: Locale; mode: 
         />
       </div>
       {module && <div className="resourceList">{visible.length ? visible.map((resource) => <div className="resourceRow" key={resource.resourceCode}><span className="resourceType">{resource.resourceType}</span><code>{resource.resourceCode}</code><strong>{resource.title}</strong><span className="rowActions">
-        <button className="ghost" onClick={() => saveFavorite({ kind: "resource", code: resource.resourceCode, title: resource.title })}>♡</button>
-        {mode === "documents" && resource.platformUrl && <a href={resource.platformUrl} target="_blank" rel="noreferrer">{locale === "fr" ? "Lien plateforme" : "Platform link"}</a>}
-        {mode === "documents" && !resource.platformUrl && <small>{locale === "fr" ? "Lien plateforme indisponible" : "Platform link unavailable"}</small>}
-        <button className="primary" onClick={() => generateRevision(resource)} disabled={generating === resource.resourceCode}>{generating === resource.resourceCode ? "…" : (locale === "fr" ? "Fiche PAÏA" : "PAÏA Sheet")}</button>
+        <button className="ghost" onClick={() => saveFavorite({ kind: "resource", code: resource.resourceCode, title: resource.title })} title={locale === "fr" ? "Ajouter aux favoris" : "Add to favorites"}>♡</button>
+        {resource.platformUrl && <a href={resource.platformUrl} target="_blank" rel="noreferrer" title={locale === "fr" ? "Ouvrir la source autorisée" : "Open source link"}>↗ {locale === "fr" ? "Source" : "Source"}</a>}
+        <button className="primary" onClick={() => generateRevision(resource)} disabled={generating === resource.resourceCode}>{generating === resource.resourceCode ? "…" : (locale === "fr" ? "📄 Fiche PAÏA" : "📄 PAÏA Sheet")}</button>
+        <button onClick={() => generateMindMap(resource)} disabled={mindMapLoading === resource.resourceCode}>{mindMapLoading === resource.resourceCode ? "…" : (locale === "fr" ? "🧠 Carte mentale" : "🧠 Mind map")}</button>
+        <button className="questionAction" onClick={() => setQuestionResource(resource)} title={locale === "fr" ? "Poser une question sur ce sujet" : "Ask about this topic"}>?</button>
       </span></div>) : <p className="notice">{t.noResources}</p>}</div>}
     </>}
     {message && <p className="notice error">{message}</p>}
     {revision && <article className="resultSheet revisionSheet" id="revision-result"><header><span className="eyebrow">FICHE PAÏA</span><h2>{revision.title}</h2><div><code>{revision.resourceCode}</code><button onClick={() => saveFavorite({ kind: "revision", code: revision.resourceCode, title: revision.title })}>♡ {t.favoriteAdd}</button><button onClick={() => window.print()}>▣ {t.print}</button></div></header><RichText text={revision.content} /></article>}
+    {mindMap && <MindMapPanel data={mindMap} onClose={() => setMindMap(null)} />}
+    {questionResource && <ResourceQuestionModal resourceCode={questionResource.resourceCode} title={questionResource.title} locale={locale} onClose={() => setQuestionResource(null)} />}
   </section>;
 }
 
