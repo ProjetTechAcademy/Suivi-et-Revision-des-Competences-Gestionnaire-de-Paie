@@ -11,25 +11,38 @@ async function chat(system: string, user: string, options: ChatOptions = {}) {
   const apiKey = process.env.GROQ_API_KEY || "";
   if (!apiKey) throw new Error("GROQ_NOT_CONFIGURED");
 
-  const response = await fetch(`${GROQ_BASE_URL}/chat/completions`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: process.env.GROQ_MODEL || "openai/gpt-oss-120b",
-      temperature: options.temperature ?? 0.12,
-      max_completion_tokens: options.maxCompletionTokens ?? 2200,
-      messages: [{ role: "system", content: system }, { role: "user", content: user }],
-      ...(options.browserSearch ? { tools: [{ type: "browser_search" }] } : {}),
-    }),
-  });
+  const payload = {
+    model: process.env.GROQ_MODEL || "openai/gpt-oss-120b",
+    temperature: options.temperature ?? 0.12,
+    max_completion_tokens: options.maxCompletionTokens ?? 2200,
+    messages: [{ role: "system", content: system }, { role: "user", content: user }],
+    ...(options.browserSearch ? { tools: [{ type: "browser_search" }] } : {}),
+  };
 
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`GROQ_RESPONSE_FAILED:${response.status}:${text.slice(0, 220)}`);
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const response = await fetch(`${GROQ_BASE_URL}/chat/completions`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (response.ok) {
+      const data = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
+      return data.choices?.[0]?.message?.content?.trim() || "";
+    }
+
+    const body = await response.text();
+    if (response.status === 429 && attempt === 0) {
+      const retryHeader = Number(response.headers.get("retry-after") || "0");
+      const waitMs = Math.min(Math.max(retryHeader * 1000, 5000), 65000);
+      await new Promise((resolve) => setTimeout(resolve, waitMs));
+      continue;
+    }
+
+    throw new Error(`GROQ_RESPONSE_FAILED:${response.status}:${body.slice(0, 220)}`);
   }
 
-  const data = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
-  return data.choices?.[0]?.message?.content?.trim() || "";
+  throw new Error("GROQ_RESPONSE_FAILED:429:retry_exhausted");
 }
 
 const OFFICIAL_SOURCE_RULES_FR = [
@@ -160,7 +173,9 @@ export async function revisionWithGroq(resourceCode: string, title: string, cont
     );
   }
 
-  const sourceExtraction = await extractSourceInParts(fullText);
+  const sourceExtraction = fullText.length <= 18000
+    ? fullText
+    : await extractSourceInParts(fullText);
   const today = new Date().toISOString().slice(0, 10);
 
   const system = [
@@ -198,7 +213,7 @@ export async function revisionWithGroq(resourceCode: string, title: string, cont
       "EXTRACTION INTERNE FIDÈLE — À UTILISER COMME SOCLE INVISIBLE :",
       sourceExtraction,
     ].join("\n"),
-    { maxCompletionTokens: 7600, browserSearch: true, temperature: 0.08 }
+    { maxCompletionTokens: 3600, browserSearch: true, temperature: 0.08 }
   );
 }
 
