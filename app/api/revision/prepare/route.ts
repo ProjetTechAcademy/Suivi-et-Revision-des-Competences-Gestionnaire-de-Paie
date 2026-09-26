@@ -16,7 +16,15 @@ import {
   prepareRevisionGroups,
   revisionGroupStatus,
 } from "@/lib/revision-groups";
-import { analyzeSourceSliceWithGroq, mergeSliceAnalysesWithGroq } from "@/lib/groq";
+import { analyzeSourceSliceWithGroq, generateRevisionPartWithGroq, mergeSliceAnalysesWithGroq } from "@/lib/groq";
+import {
+  beginRevisionPart,
+  completeRevisionPart,
+  failRevisionPart,
+  nextRevisionPart,
+  prepareRevisionParts,
+  revisionPartStatus,
+} from "@/lib/revision-parts";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -132,10 +140,53 @@ export async function POST(request: NextRequest) {
     });
   }
 
+  await prepareRevisionParts(resourceCode, 3);
+  let parts = await revisionPartStatus(resourceCode);
+
+  if (parts.done < parts.total) {
+    const part = await nextRevisionPart(resourceCode, 3);
+    if (!part) {
+      return NextResponse.json({ stage: "parts", ready: false, progress: parts, waitMs: 8000 });
+    }
+
+    await beginRevisionPart(resourceCode, part.part_index);
+    try {
+      const content = await generateRevisionPartWithGroq({
+        resourceCode,
+        title: String(resource.title || resourceCode),
+        partIndex: part.part_index,
+        totalParts: part.totalParts,
+        source: part.source,
+        locale,
+      });
+      await completeRevisionPart(resourceCode, part.part_index, content);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Erreur inconnue";
+      console.error("PAÏA revision part retry", { resourceCode, partIndex: part.part_index, message });
+      await failRevisionPart(resourceCode, part.part_index, message);
+      return NextResponse.json({
+        error: locale === "en"
+          ? "The PAÏA section generator is temporarily saturated."
+          : "Le générateur de la partie PAÏA est momentanément saturé. Cette partie sera reprise automatiquement.",
+        code: "REVISION_PART_RETRY",
+        stage: "parts",
+        waitMs: 35000,
+      }, { status: 503 });
+    }
+
+    parts = await revisionPartStatus(resourceCode);
+    return NextResponse.json({
+      stage: "parts",
+      ready: parts.done === parts.total,
+      progress: parts,
+      waitMs: parts.done === parts.total ? 0 : 35000,
+    });
+  }
+
   return NextResponse.json({
     stage: "ready",
     ready: true,
-    progress: groups,
+    progress: parts,
     waitMs: 0,
   });
 }
