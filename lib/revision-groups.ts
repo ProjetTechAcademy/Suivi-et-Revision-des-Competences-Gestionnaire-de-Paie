@@ -58,7 +58,7 @@ export async function nextRevisionGroup(resourceCode: string, groupSize = 10) {
       FROM campus_paia.resource_analysis_groups
       WHERE resource_code = $1
         AND status IN ('pending','error')
-        AND attempts < 3
+        AND attempts < 8
       ORDER BY group_index
       LIMIT 1
     `,
