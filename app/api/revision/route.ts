@@ -3,6 +3,7 @@ import { revisionWithGroq } from "@/lib/groq";
 import { getQdrantResourceChunks } from "@/lib/qdrant";
 import { getResourceLinks } from "@/lib/resource-links";
 import { extractTextFromFile } from "@/lib/file-text";
+import { fetchResourceTextCache, upsertResourceTextCache } from "@/lib/db";
 
 type Locale = "fr" | "en";
 
@@ -35,40 +36,55 @@ export async function POST(request: NextRequest) {
   if (!resourceCode) return NextResponse.json({ error: "Code ressource obligatoire" }, { status: 400 });
 
   try {
-    const hits = await getQdrantResourceChunks(resourceCode, 120);
+    const hits = await getQdrantResourceChunks(resourceCode, 250);
     if (!hits.length) return NextResponse.json({ error: locale === "en" ? "Resource not found." : "Ressource introuvable." }, { status: 404 });
 
     const first = hits[0].payload ?? {};
     const title = publicText(first.title ?? resourceCode);
-    let contexts = hits.map((hit) => String(hit.payload?.content ?? "")).filter(Boolean);
-    let hasSourceText = first.has_source_text === true || contexts.some((item) => /Contenu indexable\s*:/i.test(item));
 
-    if (!hasSourceText) {
+    const cached = await fetchResourceTextCache(resourceCode);
+    let fullText = cached?.text_status === "text_extracted" ? cached.full_text : "";
+
+    if (!fullText) {
+      const contexts = hits.map((hit) => String(hit.payload?.content ?? "")).filter(Boolean);
+      const marker = "Contenu indexable:";
+      const rebuilt = contexts.join("\n\n");
+      const markerIndex = rebuilt.indexOf(marker);
+      if (markerIndex >= 0) fullText = rebuilt.slice(markerIndex + marker.length).trim();
+    }
+
+    if (!fullText) {
       const links = getResourceLinks(resourceCode);
       if (links.source) {
-        const extracted = await fetchSourceText(links.source, resourceCode);
-        if (extracted.trim()) {
-          contexts = [extracted];
-          hasSourceText = true;
+        fullText = await fetchSourceText(links.source, resourceCode);
+        if (fullText.trim()) {
+          await upsertResourceTextCache({
+            resourceCode,
+            fullText,
+            textStatus: "text_extracted",
+            sourceKind: "source_fallback",
+          });
         }
       }
     }
 
-    if (!hasSourceText) {
+    if (!fullText.trim()) {
       return NextResponse.json({
         error: locale === "en"
-          ? "The resource is catalogued, but its source text is not yet readable by the application."
+          ? "The resource is catalogued, but its source text is not readable yet."
           : "La ressource est bien cataloguée, mais son contenu source n’est pas encore lisible par l’application.",
         code: "SOURCE_TEXT_MISSING",
       }, { status: 422 });
     }
 
-    const content = await revisionWithGroq(resourceCode, title, contexts, locale);
+    const content = await revisionWithGroq(resourceCode, title, [fullText], locale);
     const links = getResourceLinks(resourceCode);
+
     return NextResponse.json({
       title,
       resourceCode,
       content,
+      sourceCache: cached?.text_status === "text_extracted" ? "neon" : "fallback",
       resource: {
         resourceCode,
         title,
