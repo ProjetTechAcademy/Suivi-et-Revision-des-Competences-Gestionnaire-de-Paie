@@ -435,6 +435,20 @@ export async function failSliceAnalysis(resourceCode: string, sliceIndex: number
   );
 }
 
+export async function resetEmptySliceAnalyses(resourceCode: string) {
+  await ensureResourceSliceAnalysis();
+  await getPool().query(
+    `
+      UPDATE campus_paia.resource_slice_analysis
+      SET status = 'pending', analysis_text = '', last_error = NULL, updated_at = now()
+      WHERE resource_code = $1
+        AND status = 'done'
+        AND length(btrim(analysis_text)) = 0
+    `,
+    [resourceCode],
+  );
+}
+
 export async function resourceSliceAnalysisStatus(resourceCode: string) {
   await prepareResourceSliceAnalysis(resourceCode);
   const result = await getPool().query<{
