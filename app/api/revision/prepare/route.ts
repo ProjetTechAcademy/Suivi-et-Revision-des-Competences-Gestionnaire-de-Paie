@@ -134,9 +134,9 @@ export async function POST(request: NextRequest) {
     groups = await revisionGroupStatus(resourceCode);
     return NextResponse.json({
       stage: "groups",
-      ready: groups.done === groups.total,
+      ready: false,
       progress: groups,
-      waitMs: groups.done === groups.total ? 61000 : 35000,
+      waitMs: groups.done === groups.total ? 0 : 35000,
     });
   }
 
