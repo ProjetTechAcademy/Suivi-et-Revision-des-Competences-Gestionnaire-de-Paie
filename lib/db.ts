@@ -177,6 +177,148 @@ export async function ensureResourceTextCache() {
   `);
 }
 
+export async function ensureResourceTextSlices() {
+  await getPool().query(`
+    CREATE TABLE IF NOT EXISTS campus_paia.resource_text_slices (
+      resource_code text NOT NULL REFERENCES campus_paia.resources(resource_code) ON DELETE CASCADE,
+      slice_index integer NOT NULL,
+      char_start integer NOT NULL,
+      char_end integer NOT NULL,
+      slice_chars integer NOT NULL,
+      slice_text text NOT NULL,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      PRIMARY KEY (resource_code, slice_index)
+    )
+  `);
+  await getPool().query(`
+    CREATE INDEX IF NOT EXISTS idx_resource_text_slices_resource
+    ON campus_paia.resource_text_slices(resource_code, slice_index)
+  `);
+}
+
+export async function rebuildResourceTextSlices(resourceCode: string) {
+  await ensureResourceTextSlices();
+  await getPool().query(
+    `DELETE FROM campus_paia.resource_text_slices WHERE resource_code = $1`,
+    [resourceCode],
+  );
+
+  const result = await getPool().query<{ count: number }>(
+    `
+      WITH source AS (
+        SELECT resource_code, full_text, length(full_text) AS total_chars
+        FROM campus_paia.resource_text_cache
+        WHERE resource_code = $1
+          AND text_status = 'text_extracted'
+          AND length(full_text) > 0
+      ),
+      starts AS (
+        SELECT
+          source.resource_code,
+          source.full_text,
+          source.total_chars,
+          gs AS slice_index,
+          1 + ((gs - 1) * 9500) AS char_start
+        FROM source
+        CROSS JOIN LATERAL generate_series(
+          1,
+          GREATEST(1, CEIL((source.total_chars - 500)::numeric / 9500)::int)
+        ) AS gs
+      ),
+      inserted AS (
+        INSERT INTO campus_paia.resource_text_slices (
+          resource_code, slice_index, char_start, char_end, slice_chars, slice_text
+        )
+        SELECT
+          resource_code,
+          slice_index,
+          char_start,
+          LEAST(total_chars, char_start + 9999),
+          length(substring(full_text FROM char_start FOR 10000)),
+          substring(full_text FROM char_start FOR 10000)
+        FROM starts
+        RETURNING 1
+      )
+      SELECT count(*)::int AS count FROM inserted
+    `,
+    [resourceCode],
+  );
+
+  return result.rows[0]?.count ?? 0;
+}
+
+export async function rebuildAllResourceTextSlices() {
+  await ensureResourceTextSlices();
+  await getPool().query(`TRUNCATE TABLE campus_paia.resource_text_slices`);
+
+  const result = await getPool().query<{ resources: number; slices: number }>(`
+    WITH source AS (
+      SELECT resource_code, full_text, length(full_text) AS total_chars
+      FROM campus_paia.resource_text_cache
+      WHERE text_status = 'text_extracted'
+        AND length(full_text) > 0
+    ),
+    starts AS (
+      SELECT
+        source.resource_code,
+        source.full_text,
+        source.total_chars,
+        gs AS slice_index,
+        1 + ((gs - 1) * 9500) AS char_start
+      FROM source
+      CROSS JOIN LATERAL generate_series(
+        1,
+        GREATEST(1, CEIL((source.total_chars - 500)::numeric / 9500)::int)
+      ) AS gs
+    ),
+    inserted AS (
+      INSERT INTO campus_paia.resource_text_slices (
+        resource_code, slice_index, char_start, char_end, slice_chars, slice_text
+      )
+      SELECT
+        resource_code,
+        slice_index,
+        char_start,
+        LEAST(total_chars, char_start + 9999),
+        length(substring(full_text FROM char_start FOR 10000)),
+        substring(full_text FROM char_start FOR 10000)
+      FROM starts
+      RETURNING resource_code
+    )
+    SELECT
+      count(DISTINCT resource_code)::int AS resources,
+      count(*)::int AS slices
+    FROM inserted
+  `);
+
+  return result.rows[0] ?? { resources: 0, slices: 0 };
+}
+
+export async function resourceTextSliceStats() {
+  await ensureResourceTextSlices();
+  const result = await getPool().query<{
+    resources: number;
+    slices: number;
+    min_slices: number;
+    max_slices: number;
+    avg_slices: string;
+  }>(`
+    WITH per_resource AS (
+      SELECT resource_code, count(*)::int AS slice_count
+      FROM campus_paia.resource_text_slices
+      GROUP BY resource_code
+    )
+    SELECT
+      count(*)::int AS resources,
+      COALESCE(sum(slice_count), 0)::int AS slices,
+      COALESCE(min(slice_count), 0)::int AS min_slices,
+      COALESCE(max(slice_count), 0)::int AS max_slices,
+      COALESCE(round(avg(slice_count)::numeric, 2), 0)::text AS avg_slices
+    FROM per_resource
+  `);
+  return result.rows[0];
+}
+
 export async function upsertResourceTextCache(input: {
   resourceCode: string;
   fullText: string;
@@ -210,6 +352,8 @@ export async function upsertResourceTextCache(input: {
       input.sourceHash || null,
     ],
   );
+
+  await rebuildResourceTextSlices(input.resourceCode);
 }
 
 export async function fetchResourceTextCache(resourceCode: string) {
