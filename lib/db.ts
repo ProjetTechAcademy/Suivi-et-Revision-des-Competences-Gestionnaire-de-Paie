@@ -319,6 +319,160 @@ export async function resourceTextSliceStats() {
   return result.rows[0];
 }
 
+export type ResourceSliceRow = {
+  resource_code: string;
+  slice_index: number;
+  char_start: number;
+  char_end: number;
+  slice_chars: number;
+  slice_text: string;
+};
+
+export async function fetchResourceTextSlices(resourceCode: string) {
+  await ensureResourceTextSlices();
+  const result = await getPool().query<ResourceSliceRow>(
+    `
+      SELECT resource_code, slice_index, char_start, char_end, slice_chars, slice_text
+      FROM campus_paia.resource_text_slices
+      WHERE resource_code = $1
+      ORDER BY slice_index
+    `,
+    [resourceCode],
+  );
+  return result.rows;
+}
+
+export async function ensureResourceSliceAnalysis() {
+  await getPool().query(`
+    CREATE TABLE IF NOT EXISTS campus_paia.resource_slice_analysis (
+      resource_code text NOT NULL,
+      slice_index integer NOT NULL,
+      analysis_text text NOT NULL DEFAULT '',
+      status text NOT NULL DEFAULT 'pending',
+      attempts integer NOT NULL DEFAULT 0,
+      last_error text,
+      analyzed_at timestamptz,
+      updated_at timestamptz NOT NULL DEFAULT now(),
+      PRIMARY KEY (resource_code, slice_index),
+      FOREIGN KEY (resource_code, slice_index)
+        REFERENCES campus_paia.resource_text_slices(resource_code, slice_index)
+        ON DELETE CASCADE
+    )
+  `);
+  await getPool().query(`
+    CREATE INDEX IF NOT EXISTS idx_resource_slice_analysis_status
+    ON campus_paia.resource_slice_analysis(resource_code, status, slice_index)
+  `);
+}
+
+export async function prepareResourceSliceAnalysis(resourceCode: string) {
+  await ensureResourceSliceAnalysis();
+  await getPool().query(
+    `
+      INSERT INTO campus_paia.resource_slice_analysis (resource_code, slice_index, status)
+      SELECT s.resource_code, s.slice_index, 'pending'
+      FROM campus_paia.resource_text_slices s
+      WHERE s.resource_code = $1
+      ON CONFLICT (resource_code, slice_index) DO NOTHING
+    `,
+    [resourceCode],
+  );
+}
+
+export async function fetchNextPendingSlice(resourceCode: string) {
+  await prepareResourceSliceAnalysis(resourceCode);
+  const result = await getPool().query<ResourceSliceRow>(
+    `
+      SELECT s.resource_code, s.slice_index, s.char_start, s.char_end, s.slice_chars, s.slice_text
+      FROM campus_paia.resource_text_slices s
+      JOIN campus_paia.resource_slice_analysis a
+        ON a.resource_code = s.resource_code
+       AND a.slice_index = s.slice_index
+      WHERE s.resource_code = $1
+        AND a.status IN ('pending','error')
+        AND a.attempts < 3
+      ORDER BY s.slice_index
+      LIMIT 1
+    `,
+    [resourceCode],
+  );
+  return result.rows[0] ?? null;
+}
+
+export async function markSliceAnalysisProcessing(resourceCode: string, sliceIndex: number) {
+  await ensureResourceSliceAnalysis();
+  await getPool().query(
+    `
+      UPDATE campus_paia.resource_slice_analysis
+      SET status = 'processing', attempts = attempts + 1, last_error = NULL, updated_at = now()
+      WHERE resource_code = $1 AND slice_index = $2
+    `,
+    [resourceCode, sliceIndex],
+  );
+}
+
+export async function saveSliceAnalysis(resourceCode: string, sliceIndex: number, analysisText: string) {
+  await ensureResourceSliceAnalysis();
+  await getPool().query(
+    `
+      UPDATE campus_paia.resource_slice_analysis
+      SET analysis_text = $3, status = 'done', last_error = NULL, analyzed_at = now(), updated_at = now()
+      WHERE resource_code = $1 AND slice_index = $2
+    `,
+    [resourceCode, sliceIndex, analysisText.replace(/\u0000/g, "")],
+  );
+}
+
+export async function failSliceAnalysis(resourceCode: string, sliceIndex: number, error: string) {
+  await ensureResourceSliceAnalysis();
+  await getPool().query(
+    `
+      UPDATE campus_paia.resource_slice_analysis
+      SET status = 'error', last_error = $3, updated_at = now()
+      WHERE resource_code = $1 AND slice_index = $2
+    `,
+    [resourceCode, sliceIndex, error.slice(0, 1000)],
+  );
+}
+
+export async function resourceSliceAnalysisStatus(resourceCode: string) {
+  await prepareResourceSliceAnalysis(resourceCode);
+  const result = await getPool().query<{
+    total: number;
+    done: number;
+    pending: number;
+    processing: number;
+    error: number;
+  }>(
+    `
+      SELECT
+        count(*)::int AS total,
+        count(*) FILTER (WHERE status = 'done')::int AS done,
+        count(*) FILTER (WHERE status = 'pending')::int AS pending,
+        count(*) FILTER (WHERE status = 'processing')::int AS processing,
+        count(*) FILTER (WHERE status = 'error')::int AS error
+      FROM campus_paia.resource_slice_analysis
+      WHERE resource_code = $1
+    `,
+    [resourceCode],
+  );
+  return result.rows[0] ?? { total: 0, done: 0, pending: 0, processing: 0, error: 0 };
+}
+
+export async function fetchCompletedSliceAnalyses(resourceCode: string) {
+  await ensureResourceSliceAnalysis();
+  const result = await getPool().query<{ slice_index: number; analysis_text: string }>(
+    `
+      SELECT slice_index, analysis_text
+      FROM campus_paia.resource_slice_analysis
+      WHERE resource_code = $1 AND status = 'done'
+      ORDER BY slice_index
+    `,
+    [resourceCode],
+  );
+  return result.rows;
+}
+
 export async function upsertResourceTextCache(input: {
   resourceCode: string;
   fullText: string;
