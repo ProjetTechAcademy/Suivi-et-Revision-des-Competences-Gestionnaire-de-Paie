@@ -3,6 +3,7 @@ import { isCampusSyncAuthorized } from "@/lib/campus-auth";
 import { buildIndexDocument, normalizeCorpusResource, publicAttributes } from "@/lib/corpus";
 import { extractTextFromFile } from "@/lib/file-text";
 import { upsertQdrantDocument } from "@/lib/qdrant";
+import { upsertCorpusResource } from "@/lib/db";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -159,6 +160,18 @@ export async function POST(request: NextRequest) {
       ...attributes,
       source: "campus_catalogue",
     });
+
+    try {
+      await upsertCorpusResource(
+        { ...resource, extractedText },
+        {
+          sourceStatus: extractedText ? "text_extracted" : "metadata_only",
+          qdrantStatus: extractedText ? "indexed_text" : "indexed_metadata",
+        },
+      );
+    } catch (dbError) {
+      console.error("Campus PAÏA Neon sync error", dbError instanceof Error ? dbError.message : "unknown");
+    }
 
     return NextResponse.json({
       ...journal,
