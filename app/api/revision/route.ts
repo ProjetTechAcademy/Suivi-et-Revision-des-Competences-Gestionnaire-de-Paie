@@ -4,6 +4,7 @@ import { getQdrantResourceChunks } from "@/lib/qdrant";
 import { getResourceLinks } from "@/lib/resource-links";
 import { extractTextFromFile } from "@/lib/file-text";
 import { fetchResourceTextCache, upsertResourceTextCache } from "@/lib/db";
+import { completedRevisionGroups, prepareRevisionGroups, revisionGroupStatus } from "@/lib/revision-groups";
 
 type Locale = "fr" | "en";
 
@@ -77,7 +78,29 @@ export async function POST(request: NextRequest) {
       }, { status: 422 });
     }
 
-    const content = await revisionWithGroq(resourceCode, title, [fullText], locale);
+    let preparedContext = "";
+    try {
+      const prepared = await prepareRevisionGroups(resourceCode, 10);
+      if (prepared.ready) {
+        const groupStatus = await revisionGroupStatus(resourceCode);
+        if (groupStatus.total > 0 && groupStatus.done === groupStatus.total) {
+          const groups = await completedRevisionGroups(resourceCode);
+          preparedContext = groups
+            .map((group) => `### Groupe ${group.group_index}\n${group.analysis_text}`)
+            .join("\n\n");
+        }
+      }
+    } catch {
+      preparedContext = "";
+    }
+
+    const content = await revisionWithGroq(
+      resourceCode,
+      title,
+      [preparedContext || fullText],
+      locale,
+      Boolean(preparedContext),
+    );
     const links = getResourceLinks(resourceCode);
 
     return NextResponse.json({
