@@ -285,6 +285,72 @@ export async function mergeSliceAnalysesWithGroq(input: {
   return result;
 }
 
+export async function generateRevisionPartWithGroq(input: {
+  resourceCode: string;
+  title: string;
+  partIndex: number;
+  totalParts: number;
+  source: string;
+  locale?: Locale;
+}) {
+  const locale = input.locale ?? "fr";
+  const today = new Date().toISOString().slice(0, 10);
+
+  if (locale === "en") {
+    return chat(
+      [
+        "Generate one self-contained section of a professional PAÏA knowledge sheet from the supplied internal source only.",
+        "Do not reveal private source provenance.",
+        "Keep all supported concepts, rules, steps, exceptions, figures, examples and terminology.",
+        "Use official primary sources for any current or time-sensitive verification.",
+        "Return only the section content, not the full document.",
+      ].join(" "),
+      `Topic: ${input.title}\nPart ${input.partIndex}/${input.totalParts}\n\nSOURCE:\n${input.source}`,
+      {
+        maxCompletionTokens: 1800,
+        browserSearch: true,
+        temperature: 0.05,
+        reasoningEffort: "low",
+        model: process.env.GROQ_FINAL_PART_MODEL || "openai/gpt-oss-20b",
+        fallbackModel: "",
+      },
+    );
+  }
+
+  return chat(
+    [
+      "Tu rédiges UNE partie d'une Fiche PAÏA, pas la fiche complète.",
+      PRIVACY_RULES_FR,
+      "Le contenu métier doit rester fidèle aux analyses internes fournies : ne perds aucun concept, règle, étape, condition, exception, chiffre, formule, exemple ou nuance utile.",
+      "Réorganise pour rendre la lecture fluide et professionnelle, mais n'invente rien.",
+      "Développe chaque acronyme à sa première occurrence dans CETTE partie : terme complet (SIGLE). Explique brièvement le jargon utile.",
+      "Quand un élément est temporel, juridique, social, fiscal, paie/RH, sécurité sociale, RGPD, cybersécurité ou technique susceptible d'avoir évolué, vérifie son actualité sur une source officielle compétente.",
+      OFFICIAL_SOURCE_RULES_FR,
+      `La date de vérification est ${today}.`,
+      "Si une donnée de la base interne est dépassée ou nécessite une précision actuelle, insère immédiatement après le point concerné un bloc :::update ... :::endupdate avec la date, la règle actuelle, l'impact pratique et la source officielle directe.",
+      "Si elle est confirmée et que cela apporte une vraie valeur, utilise :::current ... :::endcurrent.",
+      "Structure locale recommandée : ### 🧠 Connaissances essentielles, ### ⚙️ Application / méthode, ### ⚠️ Vigilances et exceptions, ### 📖 Termes utiles, selon ce qui existe réellement dans la source.",
+      "N'ajoute ni exercice laissé au lecteur, ni référence à une formation, ni référence à la plateforme d'origine.",
+      "Rends uniquement cette partie en Markdown, sans titre global # FICHE PAÏA.",
+    ].join(" "),
+    [
+      `Sujet : ${input.title}`,
+      `Partie : ${input.partIndex}/${input.totalParts}`,
+      "",
+      "ANALYSES INTERNES CONSOLIDÉES :",
+      input.source,
+    ].join("\n"),
+    {
+      maxCompletionTokens: 1900,
+      browserSearch: true,
+      temperature: 0.05,
+      reasoningEffort: "low",
+      model: process.env.GROQ_FINAL_PART_MODEL || "openai/gpt-oss-20b",
+      fallbackModel: "",
+    },
+  );
+}
+
 export async function resourceQuestionWithGroq(input: {
   resourceCode: string;
   title: string;
