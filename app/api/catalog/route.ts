@@ -124,6 +124,10 @@ export async function GET() {
         connected: true,
         catalogueResources: resources.length,
         catalogueSource: "neon_postgres",
+      }, {
+        headers: {
+          "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300",
+        },
       });
     }
   } catch (error) {
@@ -140,5 +144,9 @@ export async function GET() {
     connected: false,
     catalogueResources: resources.length,
     catalogueSource: "sheet_snapshot_fallback",
+  }, {
+    headers: {
+      "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300",
+    },
   });
 }
