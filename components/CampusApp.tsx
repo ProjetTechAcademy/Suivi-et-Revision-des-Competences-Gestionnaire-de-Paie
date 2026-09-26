@@ -334,7 +334,7 @@ function ResourcePicker({ locale, mode, saveFavorite }: { locale: Locale; mode: 
                 ? "Le moteur fait une courte pause avant de reprendre…"
                 : "The engine is taking a short pause before resuming…",
             });
-            await wait(12000);
+            await wait(Math.max(12000, Number(prepare.waitMs ?? 35000)));
             continue;
           }
           throw new Error(prepare.error || "Erreur");
