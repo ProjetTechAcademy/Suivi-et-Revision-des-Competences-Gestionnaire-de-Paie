@@ -195,3 +195,43 @@ export async function getQdrantResourceChunks(resourceCode: string, limit = 120)
   return (data.result?.points ?? [])
     .sort((a, b) => Number(a.payload?.chunk_index ?? 0) - Number(b.payload?.chunk_index ?? 0));
 }
+
+
+function mergeOverlappingChunks(parts: string[]) {
+  if (!parts.length) return "";
+  let merged = parts[0].trim();
+  for (let index = 1; index < parts.length; index += 1) {
+    const next = parts[index].trim();
+    if (!next) continue;
+    const max = Math.min(900, merged.length, next.length);
+    let overlap = 0;
+    for (let size = max; size >= 40; size -= 1) {
+      if (merged.slice(-size) === next.slice(0, size)) {
+        overlap = size;
+        break;
+      }
+    }
+    merged += overlap ? next.slice(overlap) : `\n\n${next}`;
+  }
+  return merged.trim();
+}
+
+export async function reconstructQdrantResourceText(resourceCode: string) {
+  const hits = await getQdrantResourceChunks(resourceCode, 250);
+  const parts = hits
+    .map((hit) => String(hit.payload?.content ?? "").trim())
+    .filter(Boolean);
+  if (!parts.length) return { text: "", chunkCount: 0 };
+
+  const merged = mergeOverlappingChunks(parts);
+  const marker = "Contenu indexable:";
+  const markerIndex = merged.indexOf(marker);
+  const text = markerIndex >= 0
+    ? merged.slice(markerIndex + marker.length).trim()
+    : merged;
+
+  if (/^Cette ressource ne dispose pas encore de contenu plein texte indexé\.?$/i.test(text)) {
+    return { text: "", chunkCount: parts.length };
+  }
+  return { text, chunkCount: parts.length };
+}
