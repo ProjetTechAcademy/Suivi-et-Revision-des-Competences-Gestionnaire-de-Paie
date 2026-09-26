@@ -12,6 +12,7 @@ import ResourceQuestionModal from "./ResourceQuestionModal";
 type Mode = "question" | "documents" | "revision" | "favorites" | "about";
 type Answer = { title: string; summary: string; resources?: ResourceRecommendation[]; sourceTextAvailable?: boolean };
 type Revision = { title: string; resourceCode: string; content: string };
+type RevisionProgress = { stage: string; done: number; total: number; label: string };
 type CatalogResource = Omit<ResourceRecommendation, "reason"> & {
   pulse: string;
   platformUrl?: string;
@@ -247,6 +248,7 @@ function ResourcePicker({ locale, mode, saveFavorite }: { locale: Locale; mode: 
   const [message, setMessage] = useState("");
   const [revision, setRevision] = useState<Revision | null>(null);
   const [generating, setGenerating] = useState("");
+  const [revisionProgress, setRevisionProgress] = useState<RevisionProgress | null>(null);
   const [openPicker, setOpenPicker] = useState<PickerName | null>(null);
   const [mindMap, setMindMap] = useState<MindMapData | null>(null);
   const [mindMapLoading, setMindMapLoading] = useState("");
@@ -297,15 +299,106 @@ function ResourcePicker({ locale, mode, saveFavorite }: { locale: Locale; mode: 
   );
 
   const generateRevision = async (resource: CatalogResource) => {
-    setGenerating(resource.resourceCode); setMessage(""); setRevision(null);
+    setGenerating(resource.resourceCode);
+    setMessage("");
+    setRevision(null);
+    setRevisionProgress({
+      stage: "prepare",
+      done: 0,
+      total: 0,
+      label: locale === "fr" ? "Préparation du document…" : "Preparing document…",
+    });
+
+    const wait = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
+
     try {
-      const response = await fetch("/api/revision", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ resourceCode: resource.resourceCode, locale }) });
+      let ready = false;
+      let loops = 0;
+
+      while (!ready && loops < 100) {
+        loops += 1;
+        const prepareResponse = await fetch("/api/revision/prepare", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ resourceCode: resource.resourceCode, locale }),
+        });
+        const prepare = await prepareResponse.json();
+
+        if (!prepareResponse.ok) {
+          if (prepareResponse.status === 503) {
+            setRevisionProgress({
+              stage: prepare.stage || "prepare",
+              done: 0,
+              total: 0,
+              label: locale === "fr"
+                ? "Le moteur fait une courte pause avant de reprendre…"
+                : "The engine is taking a short pause before resuming…",
+            });
+            await wait(12000);
+            continue;
+          }
+          throw new Error(prepare.error || "Erreur");
+        }
+
+        const progress = prepare.progress ?? {};
+        const done = Number(progress.done ?? 0);
+        const total = Number(progress.total ?? 0);
+        let label = locale === "fr" ? "Préparation…" : "Preparing…";
+
+        if (prepare.stage === "slices") {
+          label = locale === "fr"
+            ? `🧠 Lecture structurée : ${done}/${total}`
+            : `🧠 Structured reading: ${done}/${total}`;
+        } else if (prepare.stage === "groups") {
+          label = locale === "fr"
+            ? `🧩 Consolidation : ${done}/${total}`
+            : `🧩 Consolidation: ${done}/${total}`;
+        } else if (prepare.stage === "ready") {
+          label = locale === "fr" ? "✅ Préparation terminée" : "✅ Preparation complete";
+        }
+
+        setRevisionProgress({ stage: prepare.stage || "prepare", done, total, label });
+        ready = Boolean(prepare.ready);
+
+        const waitMs = Math.max(0, Number(prepare.waitMs ?? 0));
+        if (waitMs > 0) await wait(waitMs);
+      }
+
+      if (!ready) {
+        throw new Error(locale === "fr"
+          ? "La préparation n’a pas pu se terminer automatiquement."
+          : "Preparation could not complete automatically.");
+      }
+
+      setRevisionProgress({
+        stage: "generation",
+        done: 1,
+        total: 1,
+        label: locale === "fr" ? "✍️ Génération de la Fiche PAÏA…" : "✍️ Generating PAÏA Sheet…",
+      });
+
+      const response = await fetch("/api/revision", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ resourceCode: resource.resourceCode, locale }),
+      });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Erreur");
+
       setRevision(data);
+      setRevisionProgress({
+        stage: "done",
+        done: 1,
+        total: 1,
+        label: locale === "fr" ? "✅ Fiche PAÏA prête" : "✅ PAÏA Sheet ready",
+      });
       window.setTimeout(() => document.querySelector("#revision-result")?.scrollIntoView({ behavior: "smooth" }), 80);
-    } catch (reason) { setMessage(reason instanceof Error ? reason.message : "Erreur"); }
-    finally { setGenerating(""); }
+    } catch (reason) {
+      setMessage(reason instanceof Error ? reason.message : "Erreur");
+      setRevisionProgress(null);
+    } finally {
+      setGenerating("");
+    }
   };
 
   const generateMindMap = async (resource: CatalogResource) => {
@@ -373,6 +466,11 @@ function ResourcePicker({ locale, mode, saveFavorite }: { locale: Locale; mode: 
       </span></div>) : <p className="notice">{t.noResources}</p>}</div>}
     </>}
     {message && <p className="notice error">{message}</p>}
+    {revisionProgress && <div className="revisionProgress" aria-live="polite">
+      <div className="revisionProgressTop"><strong>{revisionProgress.label}</strong>{revisionProgress.total > 0 && <span>{revisionProgress.done}/{revisionProgress.total}</span>}</div>
+      <div className="revisionProgressTrack"><span style={{ width: `${revisionProgress.total > 0 ? Math.max(6, Math.min(100, Math.round((revisionProgress.done / revisionProgress.total) * 100))) : 12}%` }} /></div>
+      <small>{locale === "fr" ? "Le travail déjà effectué est conservé : vous ne repartez pas de zéro." : "Completed work is saved: progress is never restarted from zero."}</small>
+    </div>}
     {revision && <article className="resultSheet revisionSheet" id="revision-result"><header><span className="eyebrow">FICHE PAÏA</span><h2>{revision.title}</h2><div><code>{revision.resourceCode}</code><button onClick={() => saveFavorite({ kind: "revision", code: revision.resourceCode, title: revision.title })}>♡ {t.favoriteAdd}</button><button onClick={() => window.print()}>▣ {t.print}</button></div></header><RichText text={revision.content} /></article>}
     {mindMap && <MindMapPanel data={mindMap} onClose={() => setMindMap(null)} />}
     {questionResource && <ResourceQuestionModal resourceCode={questionResource.resourceCode} title={questionResource.title} locale={locale} onClose={() => setQuestionResource(null)} />}
