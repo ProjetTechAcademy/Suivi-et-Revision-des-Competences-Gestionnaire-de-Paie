@@ -117,7 +117,14 @@ function WorkspaceChooser({ locale, mode, setMode }: { locale: Locale; mode: Mod
 }
 
 function inline(text: string) {
-  return text.split(/(\*\*[^*]+\*\*)/g).map((part, index) => part.startsWith("**") && part.endsWith("**") ? <strong key={index}>{part.slice(2, -2)}</strong> : <span key={index}>{part}</span>);
+  const tokenPattern = /(\*\*[^*]+\*\*|\*[^*]+\*|\[[^\]]+\]\(https?:\/\/[^)]+\))/g;
+  return text.split(tokenPattern).filter(Boolean).map((part, index) => {
+    if (part.startsWith("**") && part.endsWith("**")) return <strong key={index}>{part.slice(2, -2)}</strong>;
+    if (part.startsWith("*") && part.endsWith("*")) return <em key={index}>{part.slice(1, -1)}</em>;
+    const link = part.match(/^\[([^\]]+)\]\((https?:\/\/[^)]+)\)$/);
+    if (link) return <a key={index} href={link[2]} target="_blank" rel="noreferrer">{link[1]}</a>;
+    return <span key={index}>{part}</span>;
+  });
 }
 
 function splitTableRow(line: string) {
@@ -162,6 +169,23 @@ function RichText({ text }: { text: string }) {
             <tbody>{rows.map((row, rowIndex) => <tr key={rowIndex}>{headers.map((_, cellIndex) => <td key={cellIndex}>{inline(row[cellIndex] || "")}</td>)}</tr>)}</tbody>
           </table>
         </div>
+      );
+      continue;
+    }
+
+    if (line === ":::update" || line === ":::current") {
+      const kind = line === ":::update" ? "update" : "current";
+      const endMarker = kind === "update" ? ":::endupdate" : ":::endcurrent";
+      const blockLines: string[] = [];
+      index += 1;
+      while (index < lines.length && lines[index].trim() !== endMarker) {
+        blockLines.push(lines[index].trim());
+        index += 1;
+      }
+      nodes.push(
+        <aside className={`richAlert ${kind}`} key={`alert-${index}`}>
+          {blockLines.map((blockLine, blockIndex) => blockLine ? <p key={blockIndex}>{inline(blockLine)}</p> : <div className="richSpace" key={blockIndex} />)}
+        </aside>
       );
       continue;
     }
