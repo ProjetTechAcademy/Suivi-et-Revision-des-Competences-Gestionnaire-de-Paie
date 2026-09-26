@@ -5,6 +5,7 @@ type ChatOptions = {
   maxCompletionTokens?: number;
   browserSearch?: boolean;
   temperature?: number;
+  reasoningEffort?: "low" | "medium" | "high";
 };
 
 async function chat(system: string, user: string, options: ChatOptions = {}) {
@@ -15,6 +16,8 @@ async function chat(system: string, user: string, options: ChatOptions = {}) {
     model: process.env.GROQ_MODEL || "openai/gpt-oss-120b",
     temperature: options.temperature ?? 0.12,
     max_completion_tokens: options.maxCompletionTokens ?? 2200,
+    reasoning_effort: options.reasoningEffort ?? "low",
+    include_reasoning: false,
     messages: [{ role: "system", content: system }, { role: "user", content: user }],
     ...(options.browserSearch ? { tools: [{ type: "browser_search" }] } : {}),
   };
@@ -251,7 +254,7 @@ export async function mergeSliceAnalysesWithGroq(input: {
   const result = await chat(
     system,
     `Ressource : ${input.resourceCode}\nGroupe : ${input.groupIndex}\n\n${input.analysisText}`,
-    { maxCompletionTokens: 700, temperature: 0.03 }
+    { maxCompletionTokens: 1000, temperature: 0.03, reasoningEffort: "low" }
   );
 
   if (!result.trim()) throw new Error("EMPTY_GROUP_ANALYSIS");
