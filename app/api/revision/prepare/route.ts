@@ -70,6 +70,7 @@ export async function POST(request: NextRequest) {
       await saveSliceAnalysis(resourceCode, slice.slice_index, analysis);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Erreur inconnue";
+      console.error("PAÏA slice analysis retry", { resourceCode, sliceIndex: slice.slice_index, message });
       await failSliceAnalysis(resourceCode, slice.slice_index, message);
       return NextResponse.json({
         error: locale === "en"
@@ -110,6 +111,7 @@ export async function POST(request: NextRequest) {
       await completeRevisionGroup(resourceCode, group.group_index, analysis);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Erreur inconnue";
+      console.error("PAÏA group analysis retry", { resourceCode, groupIndex: group.group_index, message });
       await failRevisionGroup(resourceCode, group.group_index, message);
       return NextResponse.json({
         error: locale === "en"
