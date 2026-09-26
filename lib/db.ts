@@ -196,8 +196,44 @@ export async function ensureResourceTextSlices() {
   `);
 }
 
+async function clearDerivedResourceAnalysis(resourceCode: string) {
+  const tables = [
+    "resource_revision_parts",
+    "resource_analysis_groups",
+    "resource_slice_analysis",
+  ] as const;
+
+  for (const table of tables) {
+    try {
+      await getPool().query(
+        `DELETE FROM campus_paia.${table} WHERE resource_code = $1`,
+        [resourceCode],
+      );
+    } catch (error) {
+      if ((error as { code?: string }).code !== "42P01") throw error;
+    }
+  }
+}
+
+async function clearAllDerivedResourceAnalysis() {
+  const tables = [
+    "resource_revision_parts",
+    "resource_analysis_groups",
+    "resource_slice_analysis",
+  ] as const;
+
+  for (const table of tables) {
+    try {
+      await getPool().query(`TRUNCATE TABLE campus_paia.${table}`);
+    } catch (error) {
+      if ((error as { code?: string }).code !== "42P01") throw error;
+    }
+  }
+}
+
 export async function rebuildResourceTextSlices(resourceCode: string) {
   await ensureResourceTextSlices();
+  await clearDerivedResourceAnalysis(resourceCode);
   await getPool().query(
     `DELETE FROM campus_paia.resource_text_slices WHERE resource_code = $1`,
     [resourceCode],
@@ -249,6 +285,7 @@ export async function rebuildResourceTextSlices(resourceCode: string) {
 
 export async function rebuildAllResourceTextSlices() {
   await ensureResourceTextSlices();
+  await clearAllDerivedResourceAnalysis();
   await getPool().query(`TRUNCATE TABLE campus_paia.resource_text_slices`);
 
   const result = await getPool().query<{ resources: number; slices: number }>(`
