@@ -139,6 +139,13 @@ export async function upsertCorpusResource(
       resource.updatedAt || null,
     ],
   );
+
+  await upsertResourceTextCache({
+    resourceCode: resource.resourceCode,
+    fullText: resource.extractedText || "",
+    textStatus: resource.extractedText ? "text_extracted" : "metadata_only",
+    sourceKind: resource.extractedText ? "index_pipeline" : "metadata",
+  });
 }
 
 
