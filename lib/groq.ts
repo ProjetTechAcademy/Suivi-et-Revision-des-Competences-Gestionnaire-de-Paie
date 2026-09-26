@@ -160,7 +160,7 @@ async function extractSourceInParts(fullText: string) {
   );
 }
 
-export async function revisionWithGroq(resourceCode: string, title: string, contexts: string[], locale: Locale = "fr") {
+export async function revisionWithGroq(resourceCode: string, title: string, contexts: string[], locale: Locale = "fr", prepared = false) {
   const fullText = compactContexts(contexts, 700000);
   if (!fullText.trim()) throw new Error("SOURCE_TEXT_MISSING");
 
@@ -173,9 +173,9 @@ export async function revisionWithGroq(resourceCode: string, title: string, cont
     );
   }
 
-  const sourceExtraction = fullText.length <= 18000
+  const sourceExtraction = prepared
     ? fullText
-    : await extractSourceInParts(fullText);
+    : (fullText.length <= 18000 ? fullText : await extractSourceInParts(fullText));
   const today = new Date().toISOString().slice(0, 10);
 
   const system = [
