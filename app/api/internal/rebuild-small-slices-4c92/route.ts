@@ -6,6 +6,7 @@ export const maxDuration = 300;
 
 export async function GET() {
   await getPool().query("DROP TABLE IF EXISTS campus_paia.resource_analysis_groups");
+  await getPool().query("DROP TABLE IF EXISTS campus_paia.resource_slice_analysis");
   const rebuilt = await rebuildAllResourceTextSlices();
   const stats = await resourceTextSliceStats();
   return NextResponse.json({ rebuilt, stats });
