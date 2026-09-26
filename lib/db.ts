@@ -390,7 +390,7 @@ export async function fetchNextPendingSlice(resourceCode: string) {
        AND a.slice_index = s.slice_index
       WHERE s.resource_code = $1
         AND a.status IN ('pending','error')
-        AND a.attempts < 3
+        AND a.attempts < 8
       ORDER BY s.slice_index
       LIMIT 1
     `,
