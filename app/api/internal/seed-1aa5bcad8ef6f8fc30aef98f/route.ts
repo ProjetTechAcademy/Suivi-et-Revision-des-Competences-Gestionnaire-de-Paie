@@ -27,7 +27,9 @@ export async function GET() {
   const rows = snapshot
     .filter((item) => {
       const type = clean(item.resourceType).toUpperCase();
-      return clean(item.resourceCode) && clean(item.title) && item.reserved !== true && type !== "EMPTY";
+      const code = clean(item.resourceCode);
+      const falseReservedCorrection = code === "C360_B00_M10_L005";
+      return code && clean(item.title) && (item.reserved !== true || falseReservedCorrection) && type !== "EMPTY";
     })
     .map((item) => {
       const projectNumber = Number(String(item.project ?? "").replace(/\D/g, ""));
@@ -120,11 +122,124 @@ export async function GET() {
       synced += batch.length;
     }
 
-    const count = await pool.query("SELECT count(*)::int AS count FROM campus_paia.resources WHERE reserved = false");
+    let qdrantOverlay = 0;
+    const qdrantUrl = (process.env.QDRANT_URL || "").replace(/\/$/, "");
+    const qdrantKey = process.env.QDRANT_API_KEY || "";
+    const qdrantCollection = process.env.QDRANT_COLLECTION || "campus-paia";
+
+    if (qdrantUrl && qdrantKey) {
+      let offset: string | number | null | undefined;
+      const overlayRows: Array<{
+        resource_code: string;
+        has_source_text: boolean;
+        platform_url: string;
+        private_document_url: string;
+        source_url: string;
+      }> = [];
+
+      do {
+        const response = await fetch(
+          `${qdrantUrl}/collections/${encodeURIComponent(qdrantCollection)}/points/scroll`,
+          {
+            method: "POST",
+            headers: {
+              "api-key": qdrantKey,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              limit: 256,
+              with_payload: [
+                "resource_code",
+                "has_source_text",
+                "platform_url",
+                "private_document_url",
+                "source_url",
+              ],
+              with_vector: false,
+              ...(offset !== undefined && offset !== null ? { offset } : {}),
+            }),
+            cache: "no-store",
+          },
+        );
+
+        if (!response.ok) {
+          throw new Error(`QDRANT_SCROLL_FAILED:${response.status}`);
+        }
+
+        const data = await response.json() as {
+          result?: {
+            points?: Array<{ payload?: Record<string, unknown> }>;
+            next_page_offset?: string | number | null;
+          };
+        };
+
+        for (const point of data.result?.points ?? []) {
+          const payload = point.payload ?? {};
+          const code = clean(payload.resource_code);
+          if (!code) continue;
+          overlayRows.push({
+            resource_code: code,
+            has_source_text: payload.has_source_text === true,
+            platform_url: clean(payload.platform_url),
+            private_document_url: clean(payload.private_document_url),
+            source_url: clean(payload.source_url),
+          });
+        }
+
+        offset = data.result?.next_page_offset;
+      } while (offset !== undefined && offset !== null);
+
+      for (let start = 0; start < overlayRows.length; start += 500) {
+        const batch = overlayRows.slice(start, start + 500);
+        await pool.query(
+          `
+            WITH x AS (
+              SELECT *
+              FROM jsonb_to_recordset($1::jsonb) AS t(
+                resource_code text,
+                has_source_text boolean,
+                platform_url text,
+                private_document_url text,
+                source_url text
+              )
+            )
+            UPDATE campus_paia.resources AS r
+            SET
+              qdrant_status = CASE WHEN x.has_source_text THEN 'indexed_text' ELSE 'indexed_metadata' END,
+              source_status = CASE WHEN x.has_source_text THEN 'text_extracted' ELSE 'metadata_only' END,
+              platform_url = COALESCE(NULLIF(x.platform_url, ''), r.platform_url),
+              private_document_url = COALESCE(NULLIF(x.private_document_url, ''), r.private_document_url),
+              source_url = COALESCE(NULLIF(x.source_url, ''), r.source_url),
+              last_synced_at = now()
+            FROM x
+            WHERE r.resource_code = x.resource_code
+          `,
+          [JSON.stringify(batch)],
+        );
+      }
+
+      qdrantOverlay = overlayRows.length;
+    }
+
+    const count = await pool.query(
+      "SELECT count(*)::int AS count FROM campus_paia.resources WHERE reserved = false",
+    );
+    const statuses = await pool.query(
+      `
+        SELECT qdrant_status, count(*)::int AS count
+        FROM campus_paia.resources
+        WHERE reserved = false
+        GROUP BY qdrant_status
+        ORDER BY qdrant_status
+      `,
+    );
+
     return NextResponse.json({
       ok: true,
       synced,
       count: count.rows[0]?.count ?? 0,
+      qdrantOverlay,
+      statuses: statuses.rows,
     });
   } finally {
     await pool.end();
