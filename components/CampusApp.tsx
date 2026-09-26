@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { FormEvent, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject, type PointerEvent as ReactPointerEvent } from "react";
 import type { ResourceRecommendation } from "@/lib/corpus";
 import { copy, type Locale } from "@/lib/i18n";
 import { piaImages } from "@/lib/pia";
@@ -391,8 +391,54 @@ function AboutPanel({ locale }: { locale: Locale }) {
 
 function PiaDock({ locale, inputRef }: { locale: Locale; inputRef: RefObject<HTMLInputElement | null> }) {
   const [open, setOpen] = useState(false);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const drag = useRef({ active: false, moved: false, startX: 0, startY: 0, baseX: 0, baseY: 0 });
   const t = copy[locale];
-  return <div className="piaDock">{open && <div className="piaBubble"><strong>Païa</strong><p>{locale === "fr" ? "Je reste disponible pendant que vous travaillez." : "I stay available while you work."}</p><button onClick={() => { inputRef.current?.focus(); setOpen(false); }}>{locale === "fr" ? "Poser une question" : "Ask a question"}</button></div>}<button className="piaTrigger" onClick={() => setOpen(!open)}><img src={piaImages.default} alt="Païa" /><span><b>Païa</b><small>{t.piaRole}</small></span></button></div>;
+
+  const pointerDown = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    drag.current = {
+      active: true,
+      moved: false,
+      startX: event.clientX,
+      startY: event.clientY,
+      baseX: position.x,
+      baseY: position.y,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const pointerMove = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (!drag.current.active) return;
+    const dx = event.clientX - drag.current.startX;
+    const dy = event.clientY - drag.current.startY;
+    if (Math.abs(dx) + Math.abs(dy) > 5) drag.current.moved = true;
+    const minX = -(Math.max(window.innerWidth - 190, 0));
+    const minY = -(Math.max(window.innerHeight - 130, 0));
+    setPosition({
+      x: Math.min(0, Math.max(minX, drag.current.baseX + dx)),
+      y: Math.min(0, Math.max(minY, drag.current.baseY + dy)),
+    });
+  };
+
+  const pointerUp = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    drag.current.active = false;
+    try { event.currentTarget.releasePointerCapture(event.pointerId); } catch { /* no-op */ }
+  };
+
+  return <div className="piaDock" style={{ transform: `translate3d(${position.x}px,${position.y}px,0)` }}>
+    {open && <div className="piaBubble"><strong>Païa</strong><p>{locale === "fr" ? "Je reste disponible pendant que vous travaillez. Vous pouvez aussi me déplacer pour libérer votre lecture." : "I stay available while you work. You can drag me out of the way."}</p><button onClick={() => { inputRef.current?.focus(); setOpen(false); }}>{locale === "fr" ? "Poser une question" : "Ask a question"}</button></div>}
+    <button
+      className="piaTrigger"
+      onPointerDown={pointerDown}
+      onPointerMove={pointerMove}
+      onPointerUp={pointerUp}
+      onClick={() => { if (!drag.current.moved) setOpen(!open); drag.current.moved = false; }}
+      title={locale === "fr" ? "Cliquer pour ouvrir • glisser pour déplacer" : "Click to open • drag to move"}
+    >
+      <img src={piaImages.default} alt="Païa" />
+      <span><b>Païa</b><small>{t.piaRole}</small></span>
+    </button>
+  </div>;
 }
 
 export default function CampusApp() {
