@@ -89,11 +89,11 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  await prepareRevisionGroups(resourceCode, 10);
+  await prepareRevisionGroups(resourceCode, 5);
   let groups = await revisionGroupStatus(resourceCode);
 
   if (groups.done < groups.total) {
-    const group = await nextRevisionGroup(resourceCode, 10);
+    const group = await nextRevisionGroup(resourceCode, 5);
     if (!group) {
       return NextResponse.json({ stage: "groups", ready: false, progress: groups, waitMs: 8000 });
     }
