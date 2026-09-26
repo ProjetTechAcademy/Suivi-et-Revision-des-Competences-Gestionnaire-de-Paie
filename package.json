@@ -7,8 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit",
-    "prebuild": "node scripts/sync-neon-catalog.mjs"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "next": "15.5.24",
